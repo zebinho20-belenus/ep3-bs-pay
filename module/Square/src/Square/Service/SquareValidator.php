@@ -435,32 +435,43 @@ class SquareValidator extends AbstractService
      */
     public function isCancellable(Booking $booking)
     {
-        if ($this->user && $booking->getMeta('directpay') == 'true' && $booking->get('status_billing')!= 'paid') {
-            if ($booking->need('status') == 'single') {
-                return true;
-            }
-        }    
-        
+        // admin / assist right 
         if ($this->user && $this->user->can('calendar.cancel-single-bookings')) {
             if ($booking->need('status') == 'single') {
                 return true;
             }
         }
 
+        // admin / assist right
         if ($this->user && $this->user->can('calendar.cancel-subscription-bookings')) {
             if ($booking->need('status') == 'subscription') {
                 return true;
             }
         }
 
+        // users can only cancel own bookings 
         if (! ($this->user && $this->user->need('uid') == $booking->need('uid'))) {
             return false;
         }
 
+        // broken directpays can be cancelled - asynchrounous online payments have status directpay = false
+        if ($this->user && $booking->getMeta('directpay') == 'true' && $booking->get('status_billing')!= 'paid') {
+            if ($booking->need('status') == 'single') {
+                return true;
+            }
+        }
+
+        // asynchronuous payment with status pending can not be cancelled
+        if ($this->user && $booking->getMeta('directpay_pending') == 'true') {
+            return false;
+        }
+         
+        // users can not cancel subscription bookings
         if ($booking->need('status') == 'subscription') {
             return false;
         }
 
+        // checking cancelrange 
         $square = $this->squareManager->get($booking->need('sid'));
         $squareCancelRange = $square->get('range_cancel');
 

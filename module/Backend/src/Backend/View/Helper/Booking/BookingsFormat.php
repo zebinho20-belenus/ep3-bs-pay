@@ -18,6 +18,7 @@ class BookingsFormat extends AbstractHelper
         $html .= '<th>&nbsp;</th>';
         $html .= '<th>' . $view->t('No.') . '</th>';
         $html .= '<th>' . $view->t('Name') . '</th>';
+        $html .= '<th>' . $view->t('Member') . '</th>';
         $html .= '<th>' . $view->t('Day') . '</th>';
         $html .= '<th>' . $view->t('Date') . '</th>';
         $html .= '<th>' . $view->t('Time') . '</th>';

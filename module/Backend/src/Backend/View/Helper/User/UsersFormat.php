@@ -17,6 +17,7 @@ class UsersFormat extends AbstractHelper
         $html .= '<tr class="gray">';
         $html .= '<th>' . $view->t('No.') . '</th>';
         $html .= '<th>' . $view->t('Name') . '</th>';
+        $html .= '<th>' . $view->t('Member') . '</th>';
         $html .= '<th>' . $view->t('Status') . '</th>';
         $html .= '<th class="email-col">' . $view->t('Email address') . '</th>';
         $html .= '<th class="notes-col">' . $view->t('Notes') . '</th>';

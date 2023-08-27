@@ -28,7 +28,8 @@ class UserController extends AbstractActionController
             $filterFreeSearch = $filters['search'];
 
             try {
-                $limit = 1000;
+                //$limit = 1000;
+                $limit = null;
 
                 if ($filterFreeSearch) {
                     if (preg_match('/\(([0-9]+)\)/', $filterFreeSearch, $matches)) {

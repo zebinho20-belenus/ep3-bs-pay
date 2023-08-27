@@ -30,6 +30,16 @@ class UserFormat extends AbstractHelper
         $html .= sprintf('<td>%s</td>',
             $user->need('alias'));
 
+        $member = $user->getMeta('member');
+
+        if ($member) {
+            $html .= sprintf('<td>%s</td>',
+                $view->t('Yes'));
+        } else {
+            $html .= sprintf('<td>%s</td>',
+                $view->t('No'));
+        }
+
         $html .= sprintf('<td>%s</td>',
             $view->t($user->getStatus()));
 

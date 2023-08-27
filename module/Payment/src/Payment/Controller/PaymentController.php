@@ -256,6 +256,8 @@ class PaymentController extends AbstractActionController
                 $notes = $notes . " " . "-> paymentIntent succeded";
                 $booking->set('status_billing', 'paid');
                 $booking->setMeta('paidAt', date('Y-m-d H:i:s'));
+                $booking->setMeta('directpay_pending', false);
+                $booking->setMeta('directpay', true);
 
             } elseif ($event->type == "payment_intent.payment_failed" || $event->type == "payment_intent.canceled") {
                 // syslog(LOG_EMERG, "Failed or canceled paymentIntent");

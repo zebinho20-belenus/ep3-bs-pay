@@ -15,6 +15,7 @@ class SquareController extends AbstractActionController
         $timeEndParam = $this->params()->fromQuery('te');
         $squareParam = $this->params()->fromQuery('s');
         $flagParam = $this->params()->fromQuery('f');
+        $jsonParam = $this->params()->fromQuery('json');
 
         $serviceManager = @$this->getServiceLocator();
         $squareProductManager = $serviceManager->get('Square\Manager\SquareProductManager');
@@ -27,6 +28,10 @@ class SquareController extends AbstractActionController
         $byproducts['products'] = $products;
 
         $byproducts['flag'] = $flagParam;
+
+        if ($jsonParam == "true") {
+            return $this->jsonViewModel($byproducts);
+        }
 
         return $this->ajaxViewModel($byproducts);
     }

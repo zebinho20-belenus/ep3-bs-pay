@@ -43,7 +43,8 @@ class BookingController extends AbstractActionController
             $filters = $this->backendBookingDetermineFilters($search);
 
             try {
-                $limit = 1000;
+                // $limit = 10000;
+                $limit = null;
 
                 if ($dateStart && $dateEnd) {
                     $reservations = $reservationManager->getInRange($dateStart, $dateEnd, $limit);
@@ -153,7 +154,7 @@ class BookingController extends AbstractActionController
                         $d['bf-sid'], $d['bf-status-billing'], $d['bf-quantity'], $d['bf-notes'], $params['editMode']);
 
                     $bid = $savedBooking->get('bid');
-                    $square = $squareManager->get($booking->get('sid'));
+                    $square = $squareManager->get($savedBooking->get('sid'));
 
                     if ($this->config('genDoorCode') != null && $this->config('genDoorCode') == true && $square->getMeta('square_control') == true) {
                             $squareControlService->updateDoorCode($bid);
@@ -814,6 +815,8 @@ class BookingController extends AbstractActionController
                 $notes = $notes . " " . "-> paymentIntent succeded";
                 $booking->set('status_billing', 'paid');
                 $booking->setMeta('paidAt', date('Y-m-d H:i:s'));
+                $booking->setMeta('directpay_pending', false);
+                $booking->setMeta('directpay', true);
 
             } elseif ($event->type == "payment_intent.payment_failed" || $event->type == "payment_intent.canceled") {
                 // syslog(LOG_EMERG, "Failed or canceled paymentIntent");

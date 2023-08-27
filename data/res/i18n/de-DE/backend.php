@@ -415,4 +415,7 @@ return array(
     'Booked by' => 'Gebucht von',
 
     'User matched by' => 'Benutzer ermittelt nach',
+
+    'Yes' => 'Ja',
+    'No' => 'Nein', 
 );

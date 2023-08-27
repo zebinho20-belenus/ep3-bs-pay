@@ -5,6 +5,7 @@ namespace Backend\View\Helper\Booking;
 use Booking\Entity\Reservation;
 use Square\Manager\SquareManager;
 use Booking\Manager\Booking\BillManager;
+use User\Manager\UserManager;
 use Zend\View\Helper\AbstractHelper;
 
 class BookingFormat extends AbstractHelper
@@ -12,11 +13,13 @@ class BookingFormat extends AbstractHelper
 
     protected $squareManager;
     protected $bookingBillManager;
+    protected $userManager; 
 
-    public function __construct(SquareManager $squareManager, BillManager $bookingBillManager)
+    public function __construct(SquareManager $squareManager, BillManager $bookingBillManager, UserManager $userManager )
     {
         $this->squareManager = $squareManager;
         $this->bookingBillManager = $bookingBillManager;
+        $this->userManager = $userManager;
     }
 
     public function __invoke(Reservation $reservation, $dateStart = null, $dateEnd = null, $search = null)
@@ -49,8 +52,24 @@ class BookingFormat extends AbstractHelper
             $userName = $booking->need('uid');
         }
 
+        $user = $this->userManager->get($booking->need('uid'));
+
         $html .= sprintf('<td><b>%s</b></td>',
             $userName);
+
+        $member = 0;
+        if ($user != null && $user->getMeta('member') != null) {
+            $member = $user->getMeta('member');
+        }
+
+        if ($member) {
+        $html .= sprintf('<td>%s</td>',
+            $view->t('Yes'));
+        }
+        else {
+        $html .= sprintf('<td>%s</td>',
+            $view->t('No'));
+        }
 
         /* Date and time col */
 
