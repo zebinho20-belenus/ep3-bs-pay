@@ -23,19 +23,12 @@ final class RequestConditional implements Authentication
      */
     private $authentication;
 
-    /**
-     * @param RequestMatcher $requestMatcher
-     * @param Authentication $authentication
-     */
     public function __construct(RequestMatcher $requestMatcher, Authentication $authentication)
     {
         $this->requestMatcher = $requestMatcher;
         $this->authentication = $authentication;
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function authenticate(RequestInterface $request)
     {
         if ($this->requestMatcher->matches($request)) {

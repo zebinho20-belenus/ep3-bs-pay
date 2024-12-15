@@ -1,7 +1,6 @@
 <?php
-
 /**
- * Copyright 2012 Klarna AB
+ * Copyright 2015 Klarna AB
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +22,7 @@
  * @package    Payment_Klarna
  * @subpackage Unit_Tests
  * @author     Klarna <support@klarna.com>
- * @copyright  2012 Klarna AB
+ * @copyright  2015 Klarna AB
  * @license    http://www.apache.org/licenses/LICENSE-2.0 Apache license v2.0
  * @link       http://developers.klarna.com/
  */
@@ -35,13 +34,15 @@
  * @package    Payment_Klarna
  * @subpackage Unit_Tests
  * @author     Klarna <support@klarna.com>
- * @copyright  2012 Klarna AB
+ * @copyright  2015 Klarna AB
  * @license    http://www.apache.org/licenses/LICENSE-2.0 Apache license v2.0
  * @link       http://developers.klarna.com/
  */
 class Klarna_Checkout_HTTP_RequestTest extends PHPUnit_Framework_TestCase
 {
     /**
+     * Object to test.
+     *
      * @var Klarna_Checkout_HTTP_Request
      */
     protected $request;
@@ -123,7 +124,8 @@ class Klarna_Checkout_HTTP_RequestTest extends PHPUnit_Framework_TestCase
         $this->assertEquals(1, count($this->request->getHeaders()));
         $this->assertEquals('value', $this->request->getHeader('test'));
         $this->assertEquals(
-            array('test' => 'value'), $this->request->getHeaders()
+            array('test' => 'value'),
+            $this->request->getHeaders()
         );
 
         $this->assertEquals(null, $this->request->getHeader('undefined'));

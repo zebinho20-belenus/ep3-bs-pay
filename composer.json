@@ -5,7 +5,7 @@
     "homepage": "http://bs.hbsys.de/",
 
     "require": {
-        "php": ">=5.6 <=7.4.14",
+        "php": ">=5.6 <=8.4",
         "ext-intl": "*",
         "zendframework/zendframework": "^2.5.3",
         "symfony/polyfill-php71": "^1.19",    
@@ -16,7 +16,9 @@
         "stripe/stripe-php": "6.9.0",
         "payum/stripe": "^1.6",
         "payum/klarna-checkout": "^1.5",
-        "eluceo/ical": "^0.16.0"
+        "eluceo/ical": "^0.16.0",
+        "php-http/message-factory": "^1.1",
+        "klarna/checkout": "^4.0"
     },
 
     "autoload": {

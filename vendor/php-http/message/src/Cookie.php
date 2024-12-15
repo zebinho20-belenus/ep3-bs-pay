@@ -63,7 +63,7 @@ final class Cookie
      * @param bool           $httpOnly
      * @param \DateTime|null $expires  Expires attribute is HTTP 1.0 only and should be avoided.
      *
-     * @throws \InvalidArgumentException If name, value or max age is not valid.
+     * @throws \InvalidArgumentException if name, value or max age is not valid
      */
     public function __construct(
         $name,
@@ -73,7 +73,7 @@ final class Cookie
         $path = null,
         $secure = false,
         $httpOnly = false,
-        \DateTime $expires = null
+        ?\DateTime $expires = null
     ) {
         $this->validateName($name);
         $this->validateValue($value);
@@ -109,7 +109,7 @@ final class Cookie
         $path = null,
         $secure = false,
         $httpOnly = false,
-        \DateTime $expires = null
+        ?\DateTime $expires = null
     ) {
         $cookie = new self('name', null, null, $domain, $path, $secure, $httpOnly, $expires);
         $cookie->name = $name;
@@ -226,11 +226,9 @@ final class Cookie
     /**
      * Sets the expires.
      *
-     * @param \DateTime|null $expires
-     *
      * @return Cookie
      */
-    public function withExpires(\DateTime $expires = null)
+    public function withExpires(?\DateTime $expires = null)
     {
         $new = clone $this;
         $new->expires = $expires;
@@ -401,8 +399,6 @@ final class Cookie
      *
      * This does not compare the values, only name, domain and path.
      *
-     * @param Cookie $cookie
-     *
      * @return bool
      */
     public function match(self $cookie)
@@ -435,7 +431,7 @@ final class Cookie
      *
      * @param string $name
      *
-     * @throws \InvalidArgumentException If the name is empty or contains invalid characters.
+     * @throws \InvalidArgumentException if the name is empty or contains invalid characters
      */
     private function validateName($name)
     {
@@ -456,7 +452,7 @@ final class Cookie
      *
      * @param string|null $value
      *
-     * @throws \InvalidArgumentException If the value contains invalid characters.
+     * @throws \InvalidArgumentException if the value contains invalid characters
      */
     private function validateValue($value)
     {
@@ -472,7 +468,7 @@ final class Cookie
      *
      * @param int|null $maxAge
      *
-     * @throws \InvalidArgumentException If the Max-Age is not an empty or integer value.
+     * @throws \InvalidArgumentException if the Max-Age is not an empty or integer value
      */
     private function validateMaxAge($maxAge)
     {
@@ -515,7 +511,9 @@ final class Cookie
      */
     private function normalizePath($path)
     {
-        $path = rtrim($path, '/');
+        if (null !== $path) {
+            $path = rtrim($path, '/');
+        }
 
         if (empty($path) or '/' !== substr($path, 0, 1)) {
             $path = '/';

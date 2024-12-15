@@ -1,7 +1,6 @@
 <?php
-
 /**
- * Copyright 2012 Klarna AB
+ * Copyright 2015 Klarna AB
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +21,7 @@
  * @category  Payment
  * @package   Klarna_Checkout
  * @author    Klarna <support@klarna.com>
- * @copyright 2012 Klarna AB
+ * @copyright 2015 Klarna AB
  * @license   http://www.apache.org/licenses/LICENSE-2.0 Apache license v2.0
  * @link      http://developers.klarna.com/
  */
@@ -34,7 +33,8 @@
  * @package   Klarna_Checkout
  * @author    Majid G. <majid.garmaroudi@klarna.com>
  * @author    David K. <david.keijser@klarna.com>
- * @copyright 2012 Klarna AB
+ * @author    Matthias Feist <matthias.feist@klarna.com>
+ * @copyright 2015 Klarna AB
  * @license   http://www.apache.org/licenses/LICENSE-2.0 Apache license v2.0
  * @link      http://developers.klarna.com/
  */
@@ -72,7 +72,7 @@ class Klarna_Checkout_OrderWithConnectorTest extends PHPUnit_Framework_TestCase
      */
     public function testCreate()
     {
-        $location = 'http://stub';
+        $location = 'https://checkout.klarna.com/checkout/orders';
         $this->connector->location = $location;
         $data = array("foo" => "boo");
         $order = new Klarna_Checkout_Order($this->connector);
@@ -132,21 +132,4 @@ class Klarna_Checkout_OrderWithConnectorTest extends PHPUnit_Framework_TestCase
         $this->assertArrayHasKey("url", $this->connector->applied["options"]);
         $this->assertEquals($uri, $this->connector->applied["options"]["url"]);
     }
-
-    /**
-     * Test that entry point (Base URL) can be changed
-     *
-     * @return void
-     */
-    public function testCreateAlternativeEntryPoint()
-    {
-        $data = array("foo" => "boo");
-        $baseUri = "https://checkout.klarna.com/beta/checkout/orders";
-        Klarna_Checkout_Order::$baseUri = $baseUri;
-        $order = new Klarna_Checkout_Order($this->connector);
-        $order->create($data);
-
-        $this->assertEquals($baseUri, $this->connector->applied["options"]["url"]);
-    }
-
 }

@@ -11,12 +11,13 @@ namespace Payum\ISO4217;
 
 /**
  * A library providing ISO 4217 data.
+ * @deprecated This class is deprecated. Use Alcohol\ISO4217 instead
  */
 class ISO4217
 {
     /**
      * @param string $code
-     * @return array
+     * @return Currency
      * @throws \RuntimeException
      */
     public function findByCode($code)

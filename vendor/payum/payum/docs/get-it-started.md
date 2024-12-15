@@ -1,137 +1,196 @@
+<h2 align="center">Supporting Payum</h2>
+
+Payum is an MIT-licensed open source project with its ongoing development made possible entirely by the support of community and our customers. If you'd like to join them, please consider:
+
+- [Become a sponsor](https://www.patreon.com/makasim)
+- [Become our client](http://forma-pro.com/)
+
+---
+
 # Get it started.
 
-In this chapter we are going to talk about the most common task: purchasing a product.
-I would use paypal express checkout for example because it is popular.
-All examples are written in plain php code (no frameworks).
+Here we describe basic steps required by all supported gateways. We are going to setup models, storages, a security layer and so on.
+All that stuff will be used later.
 
-_**Note**: If you are working with [symfony2 framework check out the payum bundle documentation instead](https://github.com/Payum/PayumBundle/blob/master/Resources/doc/index.md)._
+_**Note**: If you are working with Symfony2 framework look read the bundle's [documentation](index.md#symfony-payum-bundle) instead._
+
+_**Note**: If you are working with Laravel5 framework look read the bundle's [documentation](index.md#laravel-payum-package) instead._
+
+## Install
+
+The preferred way to install the library is using [composer](http://getcomposer.org/).
+Run composer require to add dependencies to _composer.json_:
+
+```bash
+php composer.phar require payum/offline php-http/guzzle7-adapter
+```
+
+_**Note**: Where payum/offline is a php payum extension, you can for example change it to payum/paypal-express-checkout-nvp or payum/stripe. Look at [supported gateways](supported-gateways.md) to find out what you can use._
+
+_**Note**: Use payum/payum if you want to install all gateways at once._
+
+_**Note**: Use php-http/guzzle6-adapter is just an example. You can use any of [these adapters](https://packagist.org/providers/php-http/client-implementation)._
+
+Before we configure the payum let's look at the flow diagram.
+This flow is same for all gateways so once you familiar with it any other gateways could be added easily.
 
 ![How payum works](http://www.websequencediagrams.com/cgi-bin/cdraw?lz=cGFydGljaXBhbnQgcGF5cGFsLmNvbQoACwxVc2VyAAQNcHJlcGFyZS5waHAAHA1jYXB0dQAFE2RvbgAnBgpVc2VyLT4ANQs6AEUIIGEgcGF5bWVudAoAVAstLT4rAEsLOgBbCCB0b2tlbgoKAGcLLS0-AIE2CjogcmVxdWVzdCBhdXRoZW50aWNhdGlvbgoAgVkKLS0-AE0NZ2l2ZSBjb250cm9sIGJhY2sATg8tAIE-CDoAgUsFAHsHAIFTCC0-VXNlcjogc2hvdwCBQQggcmVzdWx0Cg&s=default)
 
-## Configuration
+As you can see we have to create some php files: `config.php`, `prepare.php`, `capture.php` and `done.php`.
+At the end you will have the complete solution and 
+it would be [much easier to add](paypal/express-checkout/get-it-started.md) other gateways.
+Let's start from the `config.php` and continue with rest after:
 
-Before we look at `prepare.php` we have to configure payum:
+## config.php
+
+Here we can put our gateways, storages. Also we can configure security components. The `config.php` has to be included to all left files.
 
 ```php
 <?php
 //config.php
 
-use Buzz\Client\Curl;
-use Payum\Extension\StorageExtension;
-use Payum\Paypal\ExpressCheckout\Nvp\PaymentFactory;
-use Payum\Paypal\ExpressCheckout\Nvp\Api;
-use Payum\Registry\SimpleRegistry;
-use Payum\Storage\FilesystemStorage;
-use Payum\Security\PlainHttpRequestVerifier;
+use Payum\Core\PayumBuilder;
+use Payum\Core\Payum;
+use Payum\Core\Model\Payment;
 
-$tokenStorage = new FilesystemStorage('/path/to/storage', 'Payum/Model/Token');
-$requestVerifier = new PlainHttpRequestVerifier($tokenStorage);
+$paymentClass = Payment::class;
 
-// You way want to modify it to suite your needs
-$paypalPaymentDetailsClass = 'Payum\Paypal\ExpressCheckout\Nvp\Model\PaymentDetails';
-$storages = array(
-    'paypal' => array(
-        $paypalPaymentDetailsClass => new FilesystemStorage('/path/to/storage', $paypalPaymentDetailsClass)
-    )
-);
+/** @var Payum $payum */
+$payum = (new PayumBuilder())
+    ->addDefaultStorages()
+    ->addGateway('aGateway', [
+        'factory' => 'offline',
+    ])
 
-$payments = array(
-    'paypal' => PaymentFactory::create(new Api(new Curl, array(
-       'username' => 'REPLACE WITH YOURS',
-       'password' => 'REPLACE WITH YOURS',
-       'signature' => 'REPLACE WITH YOURS',
-       'sandbox' => true
-    )
-)));
-
-$payments['paypal']->addExtension(new StorageExtension($storages['paypal'][$paypalPaymentDetailsClass]));
-
-$registry = new SimpleRegistry($payments, $storages, null, null);
+    ->getPayum()
+;
 ```
 
-An initial configuration for payum basically wants to ensure we have things ready to be stored such as
-a token, to identify our payment process. A request verifier will take that token and be also initialized.
-We also would like to have a registry of various payment mechanisms supported and the place where they are going
-to be storing their information (e.g. payment details).
+_**Note**: There are other [storages](storages.md) available. Such as Doctrine ORM\MongoODM._
 
-_**Note**: Consider using something other than `FilesystemStorage` in production. `DoctrineStorage` may be a good alternative._
+_**Note**: Consider using something other than `FilesystemStorage` in production._
 
-_**Note**: You are not required to use this PaymentDetails. Payum is designed to work with array or ArrayAccess._
+## prepare.php
 
-## Prepare payment
+At this stage we have to create an order. Add some information into it. 
+Create a capture token and delegate the job to [capture.php](examples/capture-script.md) script.
+Here's an offline gateway example:
 
 ```php
 <?php
 // prepare.php
 
-include 'config.php';
+include __DIR__.'/config.php';
 
-$storage = $registry->getStorageForClass($paypalPaymentDetailsClass, 'paypal');
+$gatewayName = 'aGateway';
 
-$paymentDetails = $storage->createModel();
-$paymentDetails['PAYMENTREQUEST_0_CURRENCYCODE'] = 'EUR';
-$paymentDetails['PAYMENTREQUEST_0_AMT'] = 1.23;
-$storage->updateModel($paymentDetails);
+/** @var \Payum\Core\Payum $payum */
+$storage = $payum->getStorage($paymentClass);
 
-$doneToken = $tokenStorage->createModel();
-$doneToken->setPaymentName('paypal');
-$doneToken->setDetails($storage->getIdentificator($paymentDetails));
-$doneToken->setTargetUrl('http://'.$_SERVER['HTTP_HOST'].'/done.php?payum_token='.$doneToken->getHash());
-$tokenStorage->updateModel($doneToken);
+$payment = $storage->create();
+$payment->setNumber(uniqid());
+$payment->setCurrencyCode('EUR');
+$payment->setTotalAmount(123); // 1.23 EUR
+$payment->setDescription('A description');
+$payment->setClientId('anId');
+$payment->setClientEmail('foo@example.com');
 
-$captureToken = $tokenStorage->createModel();
-$captureToken->setPaymentName('paypal');
-$captureToken->setDetails($storage->getIdentificator($paymentDetails));
-$captureToken->setTargetUrl('http://'.$_SERVER['HTTP_HOST'].'/capture.php?payum_token='.$captureToken->getHash());
-$captureToken->setAfterUrl($doneToken->getTargetUrl());
-$tokenStorage->updateModel($captureToken);
+$payment->setDetails(array(
+  // put here any fields in a gateway format.
+  // for example if you use Paypal ExpressCheckout you can define a description of the first item:
+  // 'L_PAYMENTREQUEST_0_DESC0' => 'A desc',
+));
 
-$paymentDetails['RETURNURL'] = $captureToken->getTargetUrl();
-$paymentDetails['CANCELURL'] = $captureToken->getTargetUrl();
-$storage->updateModel($paymentDetails);
+
+$storage->update($payment);
+
+$captureToken = $payum->getTokenFactory()->createCaptureToken($gatewayName, $payment, 'done.php');
 
 header("Location: ".$captureToken->getTargetUrl());
 ```
 
-With a basic configuration now we proceed to update payment details, use the payment details stored
-reference to create and relate to it two tokens, one is the done token, and the other is the capture token.
-We relate the tokens back to the payment details by assigning its return and cancel urls which now contain
-specific hashes from the tokens. After all is prepared, finally we start the capturing process.
+_**Note**: There are examples for all [supported gateways](supported-gateways.md)._
 
-The main purpose of using tokens is to hide any sensitive\guessable information from a spying user.
-All a spying user sees is the random hash so it would be a bit hard to hack your payment process.
+## capture.php
 
-## Capture payment
-
-If you read the previous chapter carefully you may noticed that in the `prepare.php` script we set
-`capture.php` as the target url of capture token.
-On the last lines of `prepare.php` we delegated the job to `capture.php` script.
-This file is designed to be reused by any possible payment process.
-So if you don't want to dive into details just [copy\paste it](capture-script.md).
-
-## Show payment status (done.php)
-
-After the capture did its job you will be redirected to `done.php`.
-The `capture.php` script always redirects you to `done.php` no matter the payment was a success or not.
-In `done.php` we will check the payment status and act on its result.
+When the preparation is done a user is redirect to `capture.php`. Here's an example of this file. You can just copy\past the code. 
+It has to work for all gateways without any modification from your side. 
 
 ```php
 <?php
-include 'config.php';
+//capture.php
 
-$token = $requestVerifier->verify($_REQUEST);
-$payment = $registry->getPayment($token->getPaymentName());
+use Payum\Core\Request\Capture;
+use Payum\Core\Reply\HttpRedirect;
+use Payum\Core\Reply\HttpPostRedirect;
 
-$payment->execute($status = new BinaryMaskStatusRequest($token));
-if ($status->isSuccess()) {
-    echo 'payment captured successfully';
-} else {
-    echo 'payment captured not successfully';
+include __DIR__.'/config.php';
+
+/** @var \Payum\Core\Payum $payum */
+$token = $payum->getHttpRequestVerifier()->verify($_REQUEST);
+$gateway = $payum->getGateway($token->getGatewayName());
+
+/** @var \Payum\Core\GatewayInterface $gateway */
+if ($reply = $gateway->execute(new Capture($token), true)) {
+    if ($reply instanceof HttpRedirect) {
+        header("Location: ".$reply->getUrl());
+        die();
+    } elseif ($reply instanceof HttpPostRedirect) {
+        echo $reply->getContent();
+        die();
+    }
+
+    throw new \LogicException('Unsupported reply', null, $reply);
 }
+
+/** @var \Payum\Core\Payum $payum */
+$payum->getHttpRequestVerifier()->invalidate($token);
+
+header("Location: ".$token->getAfterUrl());
 ```
 
-_**Note**: Success is not the only one status available. There are other statuses possible: pending, failure, canceled etc._
+_**Note**: Find out more about capture script in the [dedicated chapter](examples/capture-script.md)._
 
-Next [The architecture](the-architecture.md).
+## done.php
+
+After the capture did its job you will be redirected to [done.php](examples/done-script.md).
+The [capture.php](examples/capture-script.md) script always redirects you to `done.php` no matter the payment was a success or not.
+In `done.php` we may check the payment status, update the model, dispatch events and so on.
+
+```php
+<?php
+// done.php
+
+use Payum\Core\Request\GetHumanStatus;
+
+include __DIR__.'/config.php';
+
+/** @var \Payum\Core\Payum $payum */
+$token = $payum->getHttpRequestVerifier()->verify($_REQUEST);
+$gateway = $payum->getGateway($token->getGatewayName());
+
+// you can invalidate the token. The url could not be requested any more.
+// $payum->getHttpRequestVerifier()->invalidate($token);
+
+// Once you have token you can get the model from the storage directly. 
+//$identity = $token->getDetails();
+//$payment = $payum->getStorage($identity->getClass())->find($identity);
+
+// or Payum can fetch the model for you while executing a request (Preferred).
+$gateway->execute($status = new GetHumanStatus($token));
+$payment = $status->getFirstModel();
+
+header('Content-Type: application/json');
+echo json_encode([
+    'status' => $status->getValue(),
+    'order' => [
+        'total_amount' => $payment->getTotalAmount(),
+        'currency_code' => $payment->getCurrencyCode(),
+        'details' => $payment->getDetails(),
+    ],
+]);
+```
+
+_**Note**: Find out more about done script in the [dedicated chapter](examples/done-script.md)._
 
 Back to [index](index.md).

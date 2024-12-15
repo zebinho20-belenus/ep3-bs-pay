@@ -13,9 +13,6 @@ use Psr\Http\Message\ResponseInterface;
  */
 class CurlCommandFormatter implements Formatter
 {
-    /**
-     * {@inheritdoc}
-     */
     public function formatRequest(RequestInterface $request)
     {
         $command = sprintf('curl %s', escapeshellarg((string) $request->getUri()->withFragment('')));
@@ -42,7 +39,8 @@ class CurlCommandFormatter implements Formatter
             } elseif ($body->isSeekable()) {
                 $data = $body->__toString();
                 $body->rewind();
-                if (preg_match('/[\x00-\x1F\x7F]/', $data)) {
+                // all non-printable ASCII characters and <DEL> except for \t, \r, \n
+                if (preg_match('/([\x00-\x09\x0C\x0E-\x1F\x7F])/', $data)) {
                     $data = '[binary stream omitted]';
                 }
             } else {
@@ -59,17 +57,22 @@ class CurlCommandFormatter implements Formatter
         return $command;
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function formatResponse(ResponseInterface $response)
     {
         return '';
     }
 
     /**
-     * @param RequestInterface $request
+     * Formats a response in context of its request.
      *
+     * @return string
+     */
+    public function formatResponseForRequest(ResponseInterface $response, RequestInterface $request)
+    {
+        return $this->formatResponse($response);
+    }
+
+    /**
      * @return string
      */
     private function getHeadersAsCommandOptions(RequestInterface $request)

@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright 2013 Klarna AB
+ * Copyright 2015 Klarna AB
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,20 +22,30 @@
  * @package   Klarna_Checkout
  * @author    David Keijser <david.keijser@klarna.com>
  * @author    Rickard Dybeck <rickard.dybeck@klarna.com>
- * @copyright 2013 Klarna AB
+ * @author    Matthias Feist <matthias.feist@klarna.com>
+ * @copyright 2015 Klarna AB
  * @license   http://www.apache.org/licenses/LICENSE-2.0 Apache license v2.0
  * @link      http://developers.klarna.com/
  */
 
 require_once 'src/Klarna/Checkout.php';
 
-Klarna_Checkout_Order::$contentType
-    = 'application/vnd.klarna.checkout.aggregated-order-v2+json';
-
 $sharedSecret = 'sharedSecret';
-$orderUri = 'https://checkout.testdrive.klarna.com/checkout/orders/ABC123';
+$orderID = 'ABC123';
 
-$connector = Klarna_Checkout_Connector::create($sharedSecret);
-$order = new Klarna_Checkout_Order($connector, $orderUri);
+$connector = Klarna_Checkout_Connector::create(
+    $sharedSecret,
+    Klarna_Checkout_Connector::BASE_TEST_URL
+);
 
-$order->fetch();
+$order = new Klarna_Checkout_Order($connector, $orderID);
+
+try {
+    $order->fetch();
+} catch (Klarna_Checkout_ApiErrorException $e) {
+    var_dump($e->getMessage());
+    var_dump($e->getPayload());
+    die;
+}
+
+var_dump($order);

@@ -1,39 +1,50 @@
+<h2 align="center">Supporting Payum</h2>
+
+Payum is an MIT-licensed open source project with its ongoing development made possible entirely by the support of community and our customers. If you'd like to join them, please consider:
+
+- [Become a sponsor](https://www.patreon.com/makasim)
+- [Become our client](http://forma-pro.com/)
+
+---
+
 # Logging
 
 Since we are dealing with payments it is required to log sensitive details. if the problem appear it would be easy to find out the problem when you have a good log file. This lib provide support of [PSR-3 compatible loggers](http://www.php-fig.org/psr/psr-3/).
 
-To inject a logger you have to create a logger itself, and add an extension with that logger to a payment.
+To inject a logger you have to create a logger itself, and add an extension with that logger to a gateway.
 
 ```php
 <?php
-use Payum\Bridge\Psr\Log\LoggerExtension;
-use Payum\Examples\Action\LoggerAwareAction;
-use Payum\Payment;
+use Payum\Core\Bridge\Psr\Log\LoggerExtension;
+use Payum\Core\Tests\Mocks\Action\LoggerAwareAction;
+use Payum\Core\Gateway;
 
+/** @var \Psr\Log\LoggerInterface $logger */
 
-$payment = new Payment;
-$payment->addExtension(new LoggerExtension($logger));
-$payment->addAction(new LoggerAwareAction);
+$gateway = new Gateway;
+$gateway->addExtension(new LoggerExtension($logger));
+$gateway->addAction(new LoggerAwareAction);
 
-$payment->execute('a request');
+$gateway->execute('a request');
 ```
 
 After you are done you can simply implement `LoggerAwareInterface` interface to an action where you want log something. It will be injected by the extension.
 
 ```php
 <?php
-namespace Payum\Examples\Action;
+namespace App\Payum\Action;
 
-use Payum\Action\ActionInterface;
+use Payum\Core\Action\ActionInterface;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerInterface;
 
 class LoggerAwareAction implements ActionInterface, LoggerAwareInterface
 {
+    /** @var \Psr\Log\LoggerInterface $logger */
     protected $logger;
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
      */
     public function setLogger(LoggerInterface $logger)
     {
@@ -41,7 +52,7 @@ class LoggerAwareAction implements ActionInterface, LoggerAwareInterface
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
      */
     public function execute($request)
     {
@@ -51,7 +62,7 @@ class LoggerAwareAction implements ActionInterface, LoggerAwareInterface
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
      */
     public function supports($request)
     {

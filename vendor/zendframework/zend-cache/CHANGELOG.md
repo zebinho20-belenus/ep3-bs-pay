@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file, in reverse chronological order by release.
 
+## 2.8.3 - 2019-08-28
+
+### Added
+
+- Nothing.
+
+### Changed
+
+- Nothing.
+
+### Deprecated
+
+- Nothing.
+
+### Removed
+
+- Nothing.
+
+### Fixed
+
+- [#184](https://github.com/zendframework/zend-cache/pull/184) fixes
+  an issue with SimpleCacheDecorator where elements were deleted
+  after creation. Wrong TTL was set instead of using default value
+  from options.
+
+- [#182](https://github.com/zendframework/zend-cache/pull/182) fixes
+  a typo in variable name within the `ExtMongoDbResourceManager::getResource`
+  method which prevented using custom db name when using that adapter.
+
 ## 2.8.2 - 2018-05-01
 
 ### Added

@@ -1,13 +1,13 @@
 <?php
 
 /**
- * League.Uri (https://uri.thephpleague.com/components/).
+ * League.Uri (http://uri.thephpleague.com/components)
  *
  * @package    League\Uri
  * @subpackage League\Uri\Components
  * @author     Ignace Nyamagana Butera <nyamsprod@gmail.com>
  * @license    https://github.com/thephpleague/uri-components/blob/master/LICENSE (MIT License)
- * @version    1.8.2
+ * @version    2.0.2
  * @link       https://github.com/thephpleague/uri-components
  *
  * For the full copyright and license information, please view the LICENSE
@@ -18,251 +18,196 @@ declare(strict_types=1);
 
 namespace League\Uri\Components;
 
-/**
- * Value object representing the UserInfo part of an URI.
- *
- * @package    League\Uri
- * @subpackage League\Uri\Components
- * @author     Ignace Nyamagana Butera <nyamsprod@gmail.com>
- * @since      1.0.0
- * @see        https://tools.ietf.org/html/rfc3986#section-3.2.1
- *
- */
-class UserInfo implements ComponentInterface
+use League\Uri\Contracts\AuthorityInterface;
+use League\Uri\Contracts\UriComponentInterface;
+use League\Uri\Contracts\UriInterface;
+use League\Uri\Contracts\UserInfoInterface;
+use Psr\Http\Message\UriInterface as Psr7UriInterface;
+use TypeError;
+use function explode;
+use function preg_replace_callback;
+use function rawurldecode;
+use function sprintf;
+
+final class UserInfo extends Component implements UserInfoInterface
 {
-    use ComponentTrait;
+    private const REGEXP_USER_ENCODING = '/(?:[^A-Za-z0-9_\-\.~\!\$&\'\(\)\*\+,;\=%]+|%(?![A-Fa-f0-9]{2}))/x';
+
+    private const REGEXP_PASS_ENCODING = '/(?:[^A-Za-z0-9_\-\.~\!\$&\'\(\)\*\+,;\=%\:]+|%(?![A-Fa-f0-9]{2}))/x';
+
+    private const REGEXP_ENCODED_CHAR = ',%[A-Fa-f0-9]{2},';
 
     /**
-     * User user component.
-     *
      * @var string|null
      */
-    protected $user;
+    private $user;
 
     /**
-     * Pass URI component.
-     *
      * @var string|null
      */
-    protected $pass;
+    private $pass;
 
     /**
-     * Create a new instance of UserInfo.
+     * New instance.
      *
+     * @param mixed|null $user
+     * @param mixed|null $pass
      */
-    public function __construct(string $user = null, string $pass = null)
+    public function __construct($user = null, $pass = null)
     {
-        $this->user = $this->filterUser($user);
-        if ('' != $this->user) {
-            $this->pass = $this->filterPass($pass);
+        $this->user = $this->validateComponent($user);
+        $this->pass = $this->validateComponent($pass);
+        if (null === $this->user || '' === $this->user) {
+            $this->pass = null;
         }
     }
 
     /**
-     * {@inheritdoc}
-     */
-    public function __debugInfo()
-    {
-        return [
-            'component' => $this->getContent(),
-            'user' => $this->getUser(),
-            'pass' => $this->getPass(),
-        ];
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function isNull(): bool
-    {
-        return null === $this->getContent();
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function isEmpty(): bool
-    {
-        return '' == $this->getContent();
-    }
-
-    /**
-     * Filter the URI user component.
-     *
-     *
-     * @throws Exception If the content is invalid
-     *
-     * @return string|null
-     */
-    protected function filterUser(string $str = null)
-    {
-        if (null === $str) {
-            return $str;
-        }
-
-        $str = $this->validateString($str);
-
-        return $this->decodeComponent($str);
-    }
-
-    /**
-     * Filter the URI password component.
-     *
-     *
-     * @throws Exception If the content is invalid
-     *
-     * @return string|null
-     */
-    protected function filterPass(string $str = null)
-    {
-        if (null === $str) {
-            return $str;
-        }
-
-        $str = $this->validateString($str);
-
-        return $this->decodeComponent($str);
-    }
-
-    /**
-     * Retrieve the user component of the URI User Info part.
-     *
-     *
-     * @return string|null
-     */
-    public function getUser(int $enc_type = self::RFC3986_ENCODING)
-    {
-        $this->assertValidEncoding($enc_type);
-        if (null === $this->user || '' === $this->user || self::NO_ENCODING == $enc_type) {
-            return $this->user;
-        }
-
-        if ($enc_type == self::RFC3987_ENCODING) {
-            $pattern = array_merge(str_split(self::$invalid_uri_chars), ['/', '#', '?', ':', '@']);
-
-            return str_replace($pattern, array_map('rawurlencode', $pattern), $this->user);
-        }
-
-        $regexp = '/(?:[^'.static::$unreserved_chars.static::$subdelim_chars.']+|%(?!'.static::$encoded_chars.'))/x';
-
-        if (self::RFC1738_ENCODING == $enc_type) {
-            return $this->toRFC1738($this->encode($this->user, $regexp));
-        }
-
-        return $this->encode($this->user, $regexp);
-    }
-
-    /**
-     * Retrieve the pass component of the URI User Info part.
-     *
-     *
-     * @return string|null
-     */
-    public function getPass(int $enc_type = self::RFC3986_ENCODING)
-    {
-        $this->assertValidEncoding($enc_type);
-        if (null === $this->pass || '' === $this->pass || self::NO_ENCODING == $enc_type) {
-            return $this->pass;
-        }
-
-        if ($enc_type == self::RFC3987_ENCODING) {
-            $pattern = array_merge(str_split(self::$invalid_uri_chars), ['/', '#', '?', '@']);
-
-            return str_replace($pattern, array_map('rawurlencode', $pattern), $this->pass);
-        }
-
-        $regexp = '/(?:[^'.static::$unreserved_chars.static::$subdelim_chars.']+|%(?!'.static::$encoded_chars.'))/x';
-
-        if (self::RFC1738_ENCODING == $enc_type) {
-            return $this->toRFC1738($this->encode($this->pass, $regexp));
-        }
-
-        return $this->encode($this->pass, $regexp);
-    }
-
-    /**
-     * {@inheritdoc}
+     * {@inheritDoc}
      */
     public static function __set_state(array $properties): self
     {
-        return new static($properties['user'], $properties['pass']);
+        return new self($properties['user'], $properties['pass']);
     }
 
     /**
-     * {@inheritdoc}
+     * Create a new instance from a URI object.
+     *
+     * @param mixed $uri an URI object
+     *
+     * @throws TypeError If the URI object is not supported
      */
-    public function getContent(int $enc_type = self::RFC3986_ENCODING)
+    public static function createFromUri($uri): self
     {
-        $this->assertValidEncoding($enc_type);
+        if ($uri instanceof UriInterface) {
+            $component = $uri->getUserInfo();
+            if (null === $component) {
+                return new self();
+            }
+
+            return self::createFromComponent($component);
+        }
+
+        if (!$uri instanceof Psr7UriInterface) {
+            throw new TypeError(sprintf('The object must implement the `%s` or the `%s` interface.', Psr7UriInterface::class, UriInterface::class));
+        }
+
+        $component = $uri->getUserInfo();
+        if ('' === $component) {
+            return new self();
+        }
+
+        return self::createFromComponent($component);
+    }
+
+    /**
+     * Create a new instance from a Authority object.
+     */
+    public static function createFromAuthority(AuthorityInterface $authority): self
+    {
+        $userInfo = $authority->getUserInfo();
+        if (null === $userInfo) {
+            return new self();
+        }
+
+        return self::createFromComponent($userInfo);
+    }
+
+    /**
+     * Creates a new instance from a encoded string.
+     */
+    private static function createFromComponent(string $userInfo): self
+    {
+        [$user, $pass] = explode(':', $userInfo, 2) + [1 => null];
+        if (null !== $user) {
+            $user = self::decode($user);
+        }
+
+        if (null !== $pass) {
+            $pass = self::decode($pass);
+        }
+
+        return new self($user, $pass);
+    }
+
+    /**
+     * Decodes an encoded string.
+     */
+    private static function decode(string $str): ?string
+    {
+        $decoder = static function (array $matches): string {
+            return rawurldecode($matches[0]);
+        };
+
+        return preg_replace_callback(self::REGEXP_ENCODED_CHAR, $decoder, $str);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function getContent(): ?string
+    {
         if (null === $this->user) {
             return null;
         }
 
-        $userInfo = $this->getUser($enc_type);
+        $userInfo = $this->encodeComponent($this->user, self::REGEXP_USER_ENCODING);
         if (null === $this->pass) {
             return $userInfo;
         }
 
-        return $userInfo.':'.$this->getPass($enc_type);
+        return $userInfo.':'.$this->encodeComponent($this->pass, self::REGEXP_PASS_ENCODING);
     }
 
     /**
-     * {@inheritdoc}
-     */
-    public function __toString()
-    {
-        return (string) $this->getContent();
-    }
-
-    /**
-     * {@inheritdoc}
+     * {@inheritDoc}
      */
     public function getUriComponent(): string
     {
-        $component = (string) $this->getContent();
-        if ('' == $component) {
-            return $component;
-        }
-
-        return $component.'@';
+        return $this->getContent().(null === $this->user ? '' : '@');
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
      */
-    public function withContent($content): ComponentInterface
+    public function getUser(): ?string
     {
-        if (null !== $content) {
-            $content = $this->validateString($content);
-        }
+        return $this->user;
+    }
 
+    /**
+     * {@inheritDoc}
+     */
+    public function getPass(): ?string
+    {
+        return $this->pass;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function withContent($content): UriComponentInterface
+    {
+        $content = self::filterComponent($content);
         if ($content === $this->getContent()) {
             return $this;
         }
 
-        $res = explode(':', $content, 2);
+        if (null === $content) {
+            return new self();
+        }
 
-        return $this->withUserInfo(array_shift($res), array_shift($res));
+        return self::createFromComponent($content);
     }
 
     /**
-     * Return an instance with the specified user.
-     *
-     * This method MUST retain the state of the current instance, and return
-     * an instance that contains the specified user.
-     *
-     * An empty user is equivalent to removing the user information.
-     *
-     * @param string      $user The user to use with the new instance.
-     * @param string|null $pass The pass to use with the new instance.
-     *
-     * @return static
+     * {@inheritDoc}
      */
-    public function withUserInfo(string $user, string $pass = null): self
+    public function withUserInfo($user, $pass = null): UserInfoInterface
     {
-        $user = $this->filterUser($this->validateString($user));
-        $pass = $this->filterPass($pass);
-        if ('' == $user) {
+        $user = $this->validateComponent($user);
+        $pass = $this->validateComponent($pass);
+        if (null === $user || '' === $user) {
             $pass = null;
         }
 

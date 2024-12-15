@@ -1,13 +1,30 @@
+<h2 align="center">Supporting Payum</h2>
+
+Payum is an MIT-licensed open source project with its ongoing development made possible entirely by the support of community and our customers. If you'd like to join them, please consider:
+
+- [Become a sponsor](https://www.patreon.com/makasim)
+- [Become our client](http://forma-pro.com/)
+
+---
+
 # Frameworks and e-commerce integration.
 
 ## Frameworks.
 
-* [PayumBundle](https://github.com/Payum/PayumBundle/blob/master/Resources/doc/index.md) for [Symfony2](http://symfony.com/).
+* [PayumBundle](index.md#symfony-payum-bundle) for [Symfony2](http://symfony.com/).
+* [PayumSilexProvider](index.md#silex-payum-provider) for [Silex](http://silex.sensiolabs.org/)
+* [PayumLaravelPackage](index.md#laravel-payum-package) for [Laravel](http://laravel.com/)
+* [PayumModule](index.md#zend-payum-module-external) for [Zend2](http://framework.zend.com/)
+* [PayumYiiExtension](index.md#yii-payum-extension-external) for [Yii](http://www.yiiframework.com/)
 
-This bundle provide configuration layer and useful controllers (capture, notify etc). There is a sandbox [web](http://sandbox.payum.forma-dev.com/)|[code](https://github.com/Payum/PayumBundleSandbox)
+## Storages.
 
-* [PayumModule](https://github.com/Payum/PayumModule/blob/master/docs/index.md) for [Zend2](http://framework.zend.com/)
-* [PayumYiiExtension](https://github.com/Payum/PayumYiiExtension/blob/master/docs/index.md) for [Yii](http://www.yiiframework.com/)
+* Doctrine ORM\MongoODM
+* Propel1
+* Propel2
+* Laminas Db Gateway
+* Elouqent
+* Filesystem
 
 ## E-Commerce
 
@@ -22,5 +39,9 @@ Vespolina another one e-commerce solution. It's also built on top of symfony2 fr
 * [Speckcommerce](https://github.com/speckcommerce/speck).
 
 Speckcommerce is a shop solution for zend framework2 developers. They have [plans to integrate payum](https://github.com/speckcommerce/SpeckPaypal/issues/8).
+
+* [Thelia](http://thelia.net/)
+
+French e-commerce solution. They [mentioned on their blog](http://thelia.net/thelia-attended-the-first-symfonycon-which-took-place-from-10th-to-14th-december-in-warsaw-poland/) that they want to integrate Payum.
 
 Back to [index](index.md).

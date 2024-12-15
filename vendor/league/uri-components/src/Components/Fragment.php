@@ -1,13 +1,13 @@
 <?php
 
 /**
- * League.Uri (https://uri.thephpleague.com/components/).
+ * League.Uri (http://uri.thephpleague.com/components)
  *
  * @package    League\Uri
  * @subpackage League\Uri\Components
  * @author     Ignace Nyamagana Butera <nyamsprod@gmail.com>
  * @license    https://github.com/thephpleague/uri-components/blob/master/LICENSE (MIT License)
- * @version    1.8.2
+ * @version    2.0.2
  * @link       https://github.com/thephpleague/uri-components
  *
  * For the full copyright and license information, please view the LICENSE
@@ -18,60 +18,102 @@ declare(strict_types=1);
 
 namespace League\Uri\Components;
 
-/**
- * Value object representing a URI Fragment component.
- *
- * Instances of this interface are considered immutable; all methods that
- * might change state MUST be implemented such that they retain the internal
- * state of the current instance and return an instance that contains the
- * changed state.
- *
- * @package    League\Uri
- * @subpackage League\Uri\Components
- * @author     Ignace Nyamagana Butera <nyamsprod@gmail.com>
- * @since      1.0.0
- * @see        https://tools.ietf.org/html/rfc3986#section-3.5
- */
-class Fragment extends AbstractComponent
+use League\Uri\Contracts\FragmentInterface;
+use League\Uri\Contracts\UriComponentInterface;
+use League\Uri\Contracts\UriInterface;
+use Psr\Http\Message\UriInterface as Psr7UriInterface;
+use TypeError;
+use function sprintf;
+
+final class Fragment extends Component implements FragmentInterface
 {
+    private const REGEXP_FRAGMENT_ENCODING = '/
+        (?:[^A-Za-z0-9_\-\.~\!\$&\'\(\)\*\+,;\=%\:\/@\?]+|
+        %(?![A-Fa-f0-9]{2}))
+    /x';
 
     /**
-     * {@inheritdoc}
+     * @var string|null
      */
-    public function getContent(int $enc_type = self::RFC3986_ENCODING)
+    private $fragment;
+
+    /**
+     * New instance.
+     *
+     * @param mixed|null $fragment
+     */
+    public function __construct($fragment = null)
     {
-        $this->assertValidEncoding($enc_type);
-
-        if ('' == $this->data || self::NO_ENCODING == $enc_type) {
-            return $this->data;
-        }
-
-        if (self::RFC3987_ENCODING == $enc_type) {
-            $pattern = str_split(self::$invalid_uri_chars);
-
-            return str_replace($pattern, array_map('rawurlencode', $pattern), $this->data);
-        }
-
-        $regexp = '/(?:[^'.self::$unreserved_chars.self::$subdelim_chars.'\:\/@\?]+|%(?!'.self::$encoded_chars.'))/ux';
-
-        $content = $this->encode($this->data, $regexp);
-        if (self::RFC1738_ENCODING == $enc_type) {
-            return $this->toRFC1738($content);
-        }
-
-        return $content;
+        $this->fragment = $this->validateComponent($fragment);
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     */
+    public static function __set_state(array $properties): self
+    {
+        return new self($properties['fragment']);
+    }
+
+    /**
+     * Create a new instance from a URI object.
+     *
+     * @param mixed $uri an URI object
+     *
+     * @throws TypeError If the URI object is not supported
+     */
+    public static function createFromUri($uri): self
+    {
+        if ($uri instanceof UriInterface) {
+            return new self($uri->getFragment());
+        }
+
+        if (!$uri instanceof Psr7UriInterface) {
+            throw new TypeError(sprintf('The object must implement the `%s` or the `%s` interface.', Psr7UriInterface::class, UriInterface::class));
+        }
+
+        $component = $uri->getFragment();
+        if ('' === $component) {
+            return new self();
+        }
+
+        return new self($component);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function getContent(): ?string
+    {
+        return $this->encodeComponent($this->fragment, self::REGEXP_FRAGMENT_ENCODING);
+    }
+
+    /**
+     * {@inheritDoc}
      */
     public function getUriComponent(): string
     {
-        $component = $this->__toString();
-        if (null !== $this->data) {
-            return '#'.$component;
+        return (null === $this->fragment ? '' : '#').$this->getContent();
+    }
+
+    /**
+     * Returns the decoded fragment.
+     */
+    public function decoded(): ?string
+    {
+        return $this->fragment;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function withContent($content): UriComponentInterface
+    {
+        $content = self::filterComponent($content);
+        if ($content === $this->getContent()) {
+            return $this;
         }
 
-        return $component;
+        return new self($content);
     }
 }

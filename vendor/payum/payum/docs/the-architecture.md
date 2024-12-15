@@ -1,21 +1,33 @@
+<h2 align="center">Supporting Payum</h2>
+
+Payum is an MIT-licensed open source project with its ongoing development made possible entirely by the support of community and our customers. If you'd like to join them, please consider:
+
+- [Become a sponsor](https://www.patreon.com/makasim)
+- [Become our client](http://forma-pro.com/)
+
+---
+
 # The architecture
 
 The code snippets presented below are only for demonstration purposes (pseudo code). Their goal is to illustrate the general approach to various tasks. To see real life examples please follow the links provided when appropriate.
 In general, you have to create a _[request][base-request]_ , implement _[action][action-interface]_ in order to know what to do with such request.
-And use _payment_ that implements _[payment interface][payment-interface]_.
+And use _gateway_ that implements _[gateway interface][gateway-interface]_.
 This is where things get processed.
 This interface forces us to specify route to possible actions and can execute the request.
-So, payment is the place where a request and an action meet together.
+So, gateway is the place where a request and an action meet together.
 
 _**Note**: If you'd like to see real world examples we have provided you with a sandbox: [online][sandbox-online], [code][sandbox-code]._
 
 ```php
 <?php
-$payment = new Payment;
-$payment->addAction(new CaptureAction));
+use Payum\Core\Gateway;
+use Payum\Core\Request\Capture;
+
+$gateway = new Gateway;
+$gateway->addAction(new CaptureAction);
 
 //CaptureAction does its job.
-$payment->execute($capture = new CaptureRequest(array(
+$gateway->execute($capture = new Capture(array(
     'amount' => 100,
     'currency' => 'USD'
 ));
@@ -25,6 +37,9 @@ var_export($capture->getModel());
 
 ```php
 <?php
+use Payum\Core\Action\ActionInterface;
+use Payum\Core\Request\Capture;
+
 class CaptureAction implements ActionInterface
 {
     public function execute($request)
@@ -39,7 +54,7 @@ class CaptureAction implements ActionInterface
 
     public function supports($request)
     {
-        return $request instanceof CaptureRequest;
+        return $request instanceof Capture;
     }
 }
 ```
@@ -50,74 +65,92 @@ _**Link**: See a real world example: [CaptureController][capture-controller]._
 
 ## Sub Requests
 
-An action does not want to do all the job alone, so it delegates some responsibilities to other actions. In order to achieve this the action must be a _payment aware_ action.
-Only then, it can create a sub request and pass it to the payment.
+An action does not want to do all the job alone, so it delegates some responsibilities to other actions. In order to achieve this the action must be a _gateway aware_ action.
+Only then, it can create a sub request and pass it to the gateway.
 
 ```php
 <?php
-class FooAction extends PaymentAwareAction
+use Payum\Core\Action\ActionInterface;
+use Payum\Core\GatewayAwareInterface;
+use Payum\Core\GatewayAwareTrait;
+
+class FooAction implements ActionInterface, GatewayAwareInterface
 {
+    use GatewayAwareTrait;
+    
     public function execute($request)
     {
         //do its jobs
 
         // delegate some job to bar action.
-        $this->payment->execute(new BarRequest);
+        $this->gateway->execute(new BarRequest);
     }
 }
 ```
 
 _**Link**: See paypal [CaptureAction][paypal-capture-action]._
 
-## Interactive Requests
+## Replys
 
-What about redirects? Some payments, like paypal express for instance, require authorization on their side. Payum can handle such cases and for that we use something called _[interactive requests][base-interactive-request]_.
-It is a special request object, which extends an exception.
-You can throw an interactive redirect request at any time and catch it at a top level.
+What about redirects or a credit card form? Some gateways, 
+like Paypal ExpressCheckout for instance, require authorization on their side. 
+Payum can handle such cases and for that we use something called _[replys][base-reply]_.
+It is a special object which extends an exception hence could be thrown.
+You can throw a http redirect reply for example at any time and catch it at a top level.
 
 ```php
 <?php
+use Payum\Core\Action\ActionInterface;
+use Payum\Core\Reply\HttpRedirect;
+
 class FooAction implements ActionInterface
 {
     public function execute($request)
     {
-        throw new RedirectUrlInteractiveRequest('http://example.com/auth');
+        throw new HttpRedirect('http://example.com/auth');
     }
 }
 ```
 
-Above I see an action which throws interactive request.
-The request is about redirecting user to another url.
+Above we see an action which throws a reply.
+The reply is about redirecting a user to another url.
 Next code example demonstrate how you catch and process it.
 
 ```php
 <?php
-try {
-    $payment->addAction(new FooAction);
 
-    $payment->execute(new FooRequest);
-} catch (RedirectUrlInteractiveRequest $redirectUrlInteractiveRequest) {
-    header( 'Location: '.$redirectUrlInteractiveRequest->getUrl());
+use Payum\Core\Reply\HttpRedirect;
+
+try {
+    /** @var \Payum\Core\Gateway $gateway */
+    $gateway->addAction(new FooAction);
+
+    $gateway->execute(new FooRequest);
+} catch (HttpRedirect $reply) {
+    header( 'Location: '.$reply->getUrl());
     exit;
 }
 ```
 
-_**Link**: See paypal [AuthorizeTokenAction][paypal-authorize-token-action]._
+_**Link**: See real world example: [AuthorizeTokenAction][paypal-authorize-token-action]._
 
 ## Managing status
 
 Good status handling is very important.
-Statuses must not be hard coded and should be easy to reuse, hence we use the _[interface][status-request-interface]_ to hanle this.
+Statuses must not be hard coded and should be easy to reuse, hence we use the _[interface][status-request-interface]_ to handle this.
 The [Status request][status-request] is provided by default by our library, however you are free to use your own and you can do so by implementing the status interface.
 
 ```php
 <?php
+use Payum\Core\Action\ActionInterface;
+use Payum\Core\Request\GetStatusInterface;
+
 class FooAction implements ActionInterface
 {
     public function execute($request)
     {
         if ('success condition') {
-           $request->markSuccess();
+           $request->markCaptured();
         } else if ('pending condition') {
            $request->markPending();
         } else {
@@ -127,7 +160,7 @@ class FooAction implements ActionInterface
 
     public function supports($request)
     {
-        return $request instanceof StatusRequestInterface;
+        return $request instanceof GetStatusInterface;
     }
 }
 ```
@@ -135,33 +168,41 @@ class FooAction implements ActionInterface
 ```php
 <?php
 
-$payment->addAction(new FooAction);
+use Payum\Core\Request\GetHumanStatus;
 
-$payment->execute($status = new BinaryMaskStatusRequest);
+/** @var \Payum\Core\Gateway $gateway */
+$gateway->addAction(new FooAction);
 
-$status->isSuccess();
+$gateway->execute($status = new GetHumanStatus);
+
+$status->isCaptured();
 $status->isPending();
 
 // or
 
-$status->getStatus();
+$status->getValue();
 ```
 
 _**Link**: The status logic could be a bit complicated [as paypal one][paypal-status-action] or pretty simple as [authorize.net one][authorize-status-action]._
 
 ## Extensions
 
-There must be a way to extend the payment with custom logic.
+There must be a way to extend the gateway with custom logic.
 _[Extension][extension-interface]_ to the rescue.
 Let's look at the example below.
 Imagine you want to check permissions before a user can capture the payment:
 
 ```php
 <?php
+use Payum\Core\Extension\ExtensionInterface;
+use Payum\Core\Extension\Context;
+
 class PermissionExtension implements ExtensionInterface
 {
-    public function onPreExecute($request)
+    public function onPreExecute(Context $context)
     {
+        $request = $context->getRequest();
+        
         if (false == in_array('ROLE_CUSTOMER', $request->getModel()->getRoles())) {
             throw new Exception('The user does not have the required roles.');
         }
@@ -172,11 +213,13 @@ class PermissionExtension implements ExtensionInterface
 ```
 
 ```php
-    <?php
-$payment->addExtension(new PermissionExtension);
+<?php
+
+/** @var \Payum\Core\Gateway $gateway */
+$gateway->addExtension(new PermissionExtension);
 
 // here is the place where the exception may be thrown.
-$payment->execute(new FooRequest);
+$gateway->execute(new FooRequest);
 ```
 
 _**Link**: The [storage extension][storage-extension-interface] is a built-in extension._
@@ -185,64 +228,87 @@ _**Link**: The [storage extension][storage-extension-interface] is a built-in ex
 
 Before you are redirected to the gateway side, you may want to store data somewhere, right?
 We take care of that too.
-This is handled by _[storage][storage-interface]_ and its _[storage extension][storage-extension-interface]_ for payment. The extension can solve two tasks. First it can save a model after the request is processed. Second, it can find a model by its id before the request is processed. Currently [Doctrine][doctrine-storage] and [filesystem][filesystem-storage] (use it for tests only!) storages are supported.
+This is handled by _[storage][storage-interface]_ and its _[storage extension][storage-extension-interface]_ for gateway.
+The extension can solve two tasks.
+First it can save a model after the request is processed.
+Second, it can find a model by its id before the request is processed.
+Currently [Doctrine][doctrine-storage] [Laminas Table Gateway][laminas-table-gateway] and [filesystem][filesystem-storage] (use it for tests only!) storages are supported.
 
 ```php
 <?php
+use Payum\Core\Gateway;
+use Payum\Core\Extension\StorageExtension;
+
+/** @var \Payum\Core\Storage\StorageInterface $storage */
 $storage = new FooStorage;
 
-$payment = new Payment;
-$payment->addExtension(new StorageExtension($storage));
+$gateway = new Gateway;
+$gateway->addExtension(new StorageExtension($storage));
 ```
 
 ## All about API
 
-The payment API has different versions? Or, a payment gateway provide official sdk?
+The gateway API has different versions? Or, a gateway provide official sdk?
 We already thought about these problems and you know what?
 
-Let's say payment have different versions: first and second.
+Let's say gateway have different versions: first and second.
 And in the `FooAction` we want to use first api and `BarAction` second one.
 To solve this problem we have to implement _API aware action_ to the actions.
-When such api aware action is added to a payment it tries to set an API, one by one, to the action until the action accepts one.
+When such api aware action is added to a gateway it tries to set an API, one by one, to the action until the action accepts one.
 
 ```php
 <?php
+use Payum\Core\ApiAwareInterface;
+use Payum\Core\ApiAwareTrait;
+use Payum\Core\Action\ActionInterface;
+use Payum\Core\Exception\UnsupportedApiException;
+
 class FooAction implements ActionInterface, ApiAwareInterface
 {
-    public function setApi($api)
+    use ApiAwareTrait;
+    
+    public function __construct() 
     {
-        if (false == $api instanceof FirstApi) {
-            throw new UnsupportedApiException('Not supported.');
-        }
-
-        $this->api = $api;
+        $this->apiClass = Api::class;    
+    }    
+    
+    
+    public function execute($request) 
+    {
+        $this->api; // Api::class 
     }
 }
 
 class BarAction implements ActionInterface, ApiAwareInterface
 {
-    public function setApi($api)
+    use ApiAwareTrait;
+    
+    public function __construct() 
     {
-        if (false == $api instanceof SecondApi) {
-            throw new UnsupportedApiException('Not supported.');
-        }
-
-        $this->api = $api;
+        $this->apiClass = AnotherApi::class;    
+    }    
+    
+    
+    public function execute($request) 
+    {
+        $this->api; // AnotherApi::class 
     }
 }
 ```
 
 ```php
 <?php
-$payment = new Payment;
-$payment->addApi(new FirstApi);
-$payment->addApi(new SecondApi);
+use Payum\Core\Gateway;
+
+$gateway = new Gateway;
+$gateway->addApi(new FirstApi);
+$gateway->addApi(new SecondApi);
 
 // here the ApiVersionOne will be injected to FooAction
-$payment->addAction(new FooAction);
+$gateway->addAction(new FooAction);
 
 // here the ApiVersionTwo will be injected to BarAction
-$payment->addAction(new BarAction);
+$gateway->addAction(new BarAction);
 ```
 
 _**Link**: See authorize.net [capture action][authorize-capture-action]._
@@ -253,30 +319,31 @@ As a result of the architecture described above we end up with a well decoupled,
 For example, you can add your domain specific actions or a logger extension.
 Thanks to its flexibility any task could be achieved.
 
+Next [Your order integration](your-order-integration.md).
+
 Back to [index](index.md).
 
 [sandbox-online]: http://sandbox.payum.forma-dev.com
 [sandbox-code]: https://github.com/Payum/PayumBundleSandbox
-[base-request]: https://github.com/Payum/Payum/blob/master/src/Payum/Request/BaseModelRequest.php
-[status-request-interface]: https://github.com/Payum/Payum/blob/master/src/Payum/Request/StatusRequestInterface.php
-[status-request]: https://github.com/Payum/Payum/blob/master/src/Payum/Request/BinaryMaskStatusRequest.php
-[base-interactive-request]: https://github.com/Payum/Payum/blob/master/src/Payum/Request/BaseInteractiveRequest.php
-[action-interface]: https://github.com/Payum/Payum/blob/master/src/Payum/Action/ActionInterface.php
-[extension-interface]: https://github.com/Payum/Payum/blob/master/src/Payum/Extension/ExtensionInterface.php
-[storage-extension-interface]: https://github.com/Payum/Payum/blob/master/src/Payum/Extension/StorageExtension.php
-[storage-interface]: https://github.com/Payum/Payum/blob/master/src/Payum/Storage/StorageInterface.php
-[doctrine-storage]: https://github.com/Payum/Payum/blob/master/src/Payum/Bridge/Doctrine/Storage/DoctrineStorage.php
-[filesystem-storage]: https://github.com/Payum/Payum/blob/master/src/Payum/Storage/FilesystemStorage.php
-[payment-interface]: https://github.com/Payum/Payum/blob/master/src/Payum/PaymentInterface.php
+[base-request]: https://github.com/Payum/Payum/blob/master/src/Payum/Core/Request/Generic.php
+[status-request-interface]: https://github.com/Payum/Payum/blob/master/src/Payum/Core/Request/GetStatusInterface.php
+[status-request]: https://github.com/Payum/Payum/blob/master/src/Payum/Core/Request/GetHumanStatus.php
+[base-reply]: https://github.com/Payum/Payum/blob/master/src/Payum/Core/Reply/Base.php
+[action-interface]: https://github.com/Payum/Payum/blob/master/src/Payum/Core/Action/ActionInterface.php
+[extension-interface]: https://github.com/Payum/Payum/blob/master/src/Payum/Core/Extension/ExtensionInterface.php
+[storage-extension-interface]: https://github.com/Payum/Payum/blob/master/src/Payum/Core/Extension/StorageExtension.php
+[storage-interface]: https://github.com/Payum/Payum/blob/master/src/Payum/Core/Storage/StorageInterface.php
+[doctrine-storage]: https://github.com/Payum/Payum/blob/master/src/Payum/Core/Bridge/Doctrine/Storage/DoctrineStorage.php
+[laminas-table-gateway]: https://github.com/Payum/Payum/blob/master/src/Payum/Core/Bridge/Laminas/Storage/TableGatewayStorage.php
+[filesystem-storage]: https://github.com/Payum/Payum/blob/master/src/Payum/Core/Storage/FilesystemStorage.php
+[gateway-interface]: https://github.com/Payum/Payum/blob/master/src/Payum/Core/GatewayInterface.php
 [capture-controller]: https://github.com/Payum/PayumBundle/blob/master/Controller/CaptureController.php
-[paypal-capture-action]: https://github.com/Payum/PaypalExpressCheckoutNvp/blob/master/src/Payum/Paypal/ExpressCheckout/Nvp/Action/CaptureAction.php
-[paypal-authorize-token-action]: https://github.com/Payum/PaypalExpressCheckoutNvp/blob/master/src/Payum/Paypal/ExpressCheckout/Nvp/Action/Api/AuthorizeTokenAction.php
-[paypal-status-action]: https://github.com/Payum/PaypalExpressCheckoutNvp/blob/master/src/Payum/Paypal/ExpressCheckout/Nvp/Action/PaymentDetailsStatusAction.php
-[authorize-capture-action]: https://github.com/Payum/AuthorizeNetAim/blob/master/src/Payum/AuthorizeNet/Aim/Action/CaptureAction.php
-[authorize-status-action]: https://github.com/Payum/AuthorizeNetAim/blob/master/src/Payum/AuthorizeNet/Aim/Action/StatusAction.php
+[paypal-capture-action]:https://github.com/Payum/PaypalExpressCheckoutNvp/blob/master/Action/CaptureAction.php
+[paypal-authorize-token-action]: https://github.com/Payum/Payum/blob/master/src/Payum/Paypal/ExpressCheckout/Nvp/Action/Api/AuthorizeTokenAction.php
+[paypal-status-action]: https://github.com/Payum/Payum/blob/master/src/Payum/Paypal/ExpressCheckout/Nvp/Action/PaymentDetailsStatusAction.php
+[authorize-capture-action]: https://github.com/Payum/Payum/blob/master/src/Payum/AuthorizeNet/Aim/Action/CaptureAction.php
+[authorize-status-action]: https://github.com/Payum/Payum/blob/master/src/Payum/AuthorizeNet/Aim/Action/StatusAction.php
 [omnipay]: https://github.com/adrianmacneil/omnipay
 [omnipay-example]: https://github.com/Payum/PayumBundleSandbox/blob/master/src/Acme/PaymentBundle/Controller/SimplePurchasePaypalExpressViaOmnipayController.php
-[bundle-doc]: https://github.com/Payum/PayumBundle/blob/master/Resources/doc/index.md
-[payment-factories]: https://github.com/Payum/PayumBundle/tree/master/DependencyInjection/Factory/Payment
-[storage-factories]: https://github.com/Payum/PayumBundle/tree/master/DependencyInjection/Factory/Storage
+[bundle-doc]: index.md#symfony-payum-bundle
 [payum-bundle]: https://github.com/Payum/PayumBundle/blob/master/PayumBundle.php

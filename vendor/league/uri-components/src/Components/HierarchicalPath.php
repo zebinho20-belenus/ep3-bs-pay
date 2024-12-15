@@ -1,13 +1,13 @@
 <?php
 
 /**
- * League.Uri (https://uri.thephpleague.com/components/).
+ * League.Uri (http://uri.thephpleague.com/components)
  *
  * @package    League\Uri
  * @subpackage League\Uri\Components
  * @author     Ignace Nyamagana Butera <nyamsprod@gmail.com>
  * @license    https://github.com/thephpleague/uri-components/blob/master/LICENSE (MIT License)
- * @version    1.8.2
+ * @version    2.0.2
  * @link       https://github.com/thephpleague/uri-components
  *
  * For the full copyright and license information, please view the LICENSE
@@ -18,479 +18,529 @@ declare(strict_types=1);
 
 namespace League\Uri\Components;
 
-use Traversable;
+use Iterator;
+use League\Uri\Contracts\PathInterface;
+use League\Uri\Contracts\SegmentedPathInterface;
+use League\Uri\Contracts\UriComponentInterface;
+use League\Uri\Exceptions\OffsetOutOfBounds;
+use League\Uri\Exceptions\SyntaxError;
+use TypeError;
+use function array_count_values;
+use function array_filter;
+use function array_keys;
+use function array_pop;
+use function array_unshift;
+use function count;
+use function dirname;
+use function end;
+use function explode;
+use function implode;
+use function is_scalar;
+use function ltrim;
+use function method_exists;
+use function rtrim;
+use function sprintf;
+use function str_replace;
+use function strpos;
+use function strrpos;
+use function substr;
+use const ARRAY_FILTER_USE_KEY;
+use const FILTER_VALIDATE_INT;
+use const PATHINFO_EXTENSION;
 
-/**
- * Value object representing a URI path component.
- *
- * @package    League\Uri
- * @subpackage League\Uri\Components
- * @author     Ignace Nyamagana Butera <nyamsprod@gmail.com>
- * @since      1.0.0
- */
-class HierarchicalPath extends AbstractHierarchicalComponent implements ComponentInterface
+final class HierarchicalPath extends Component implements SegmentedPathInterface
 {
-    use PathInfoTrait;
+    private const SEPARATOR = '/';
 
     /**
-     * Path segment separator.
-     *
-     * @var string
+     * @var PathInterface
      */
-    protected static $separator = '/';
+    private $path;
 
     /**
-     * {@inheritdoc}
+     * @var string[]
+     */
+    private $segments;
+
+    /**
+     * New instance.
+     *
+     * @param mixed|string $path
+     */
+    public function __construct($path = '')
+    {
+        if (!$path instanceof PathInterface) {
+            $path = new Path($path);
+        }
+
+        $this->path = $path;
+        $segments = (string) $this->decodeComponent($path->__toString());
+        if ($this->path->isAbsolute()) {
+            $segments = substr($segments, 1);
+        }
+
+        $this->segments = explode(self::SEPARATOR, $segments);
+    }
+
+    /**
+     * {@inheritDoc}
      */
     public static function __set_state(array $properties): self
     {
-        return static::createFromSegments($properties['data'], $properties['is_absolute']);
+        return new self($properties['path']);
     }
 
     /**
-     * return a new instance from an array or a traversable object.
+     * Returns a new instance from an iterable structure.
      *
-     * @param Traversable|array $data The segments list
-     * @param int               $type one of the constant IS_ABSOLUTE or IS_RELATIVE
-     *
-     * @throws Exception If $data is invalid
-     * @throws Exception If $type is not a recognized constant
-     *
-     * @return static
+     * @throws TypeError If the segments are malformed
      */
-    public static function createFromSegments($data, int $type = self::IS_RELATIVE): self
+    public static function createRelativeFromSegments(iterable $segments): self
     {
-        static $type_list = [self::IS_ABSOLUTE => 1, self::IS_RELATIVE => 1];
-
-        if (!isset($type_list[$type])) {
-            throw Exception::fromInvalidFlag($type);
-        }
-
-        if ($data instanceof self) {
-            $new = clone $data;
-            $new->is_absolute = $type;
-
-            return $new;
-        }
-
-        $path = implode(static::$separator, static::filterIterable($data));
-        if (static::IS_ABSOLUTE === $type) {
-            if (static::$separator !== substr($path, 0, 1)) {
-                return new static(static::$separator.$path);
+        $pathSegments = [];
+        foreach ($segments as $value) {
+            if (!is_scalar($value) && !method_exists($value, '__toString')) {
+                throw new TypeError('The submitted segments are invalid.');
             }
-
-            return new static($path);
+            $pathSegments[] = (string) $value;
         }
 
-        return new static(ltrim($path, '/'));
+        $path = implode(self::SEPARATOR, $pathSegments);
+
+        return new self(ltrim($path, self::SEPARATOR));
     }
 
     /**
-     * New Instance.
+     * Returns a new instance from an iterable structure.
      *
+     * @throws TypeError If the segments are malformed
      */
-    public function __construct(string $path = null)
+    public static function createAbsoluteFromSegments(iterable $segments): self
     {
-        if (null === $path) {
-            $path = '';
+        $pathSegments = [];
+        foreach ($segments as $value) {
+            if (!is_scalar($value) && !method_exists($value, '__toString')) {
+                throw new TypeError('The submitted segments are invalid.');
+            }
+            $pathSegments[] = (string) $value;
         }
 
-        $path = $this->validateString($path);
-        $this->is_absolute = static::IS_RELATIVE;
-        if (static::$separator === substr($path, 0, 1)) {
-            $this->is_absolute = static::IS_ABSOLUTE;
-            $path = substr($path, 1, strlen($path));
+        $path = implode(self::SEPARATOR, $pathSegments);
+        if (self::SEPARATOR !== ($path[0] ?? '')) {
+            return new self(self::SEPARATOR.$path);
         }
 
-        $append_delimiter = false;
-        if (static::$separator === substr($path, -1, 1)) {
-            $path = substr($path, 0, -1);
-            $append_delimiter = true;
-        }
-
-        $this->data = $this->validate($path);
-        if ($append_delimiter) {
-            $this->data[] = '';
-        }
+        return new self($path);
     }
 
     /**
-     * validate the submitted data.
+     * Create a new instance from a URI object.
      *
+     * @param mixed $uri an URI object
      *
+     * @throws TypeError If the URI object is not supported
      */
-    protected function validate(string $data): array
+    public static function createFromUri($uri): self
     {
-        $filterSegment = function ($segment) {
-            return isset($segment);
-        };
-
-        $data = $this->decodePath($data);
-
-        return array_filter(explode(static::$separator, $data), $filterSegment);
+        return new self(Path::createFromUri($uri));
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
      */
-    public function __debugInfo()
+    public function count(): int
     {
-        return [
-            'component' => $this->getContent(),
-            'segments' => $this->data,
-            'is_absolute' => (bool) $this->is_absolute,
-        ];
+        return count($this->segments);
     }
 
     /**
-     * Returns parent directory's path.
-     *
+     * {@inheritDoc}
+     */
+    public function getIterator(): Iterator
+    {
+        foreach ($this->segments as $segment) {
+            yield $segment;
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function isAbsolute(): bool
+    {
+        return $this->path->isAbsolute();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function hasTrailingSlash(): bool
+    {
+        return $this->path->hasTrailingSlash();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function getContent(): ?string
+    {
+        return $this->path->getContent();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function decoded(): string
+    {
+        return $this->path->decoded();
+    }
+    /**
+     * {@inheritDoc}
      */
     public function getDirname(): string
     {
+        $path = (string) $this->decodeComponent($this->path->__toString());
+
         return str_replace(
             ['\\', "\0"],
-            [static::$separator, '\\'],
-            dirname(str_replace('\\', "\0", $this->__toString()))
+            [self::SEPARATOR, '\\'],
+            dirname(str_replace('\\', "\0", $path))
         );
     }
 
     /**
-     * Returns the path basename.
-     *
+     * {@inheritDoc}
      */
     public function getBasename(): string
     {
-        $data = $this->data;
+        $data = $this->segments;
 
         return (string) array_pop($data);
     }
 
     /**
-     * Returns the basename extension.
-     *
+     * {@inheritDoc}
      */
     public function getExtension(): string
     {
-        list($basename, ) = explode(';', $this->getBasename(), 2);
+        [$basename, ] = explode(';', $this->getBasename(), 2);
 
         return pathinfo($basename, PATHINFO_EXTENSION);
     }
 
     /**
-     * Returns an array representation of the HierarchicalPath.
-     *
+     * {@inheritDoc}
      */
-    public function getSegments(): array
-    {
-        return $this->data;
-    }
-
-    /**
-     * Retrieves a single path segment.
-     *
-     * Retrieves a single path segment. If the segment offset has not been set,
-     * returns the default value provided.
-     *
-     * @param int   $offset  the segment offset
-     * @param mixed $default Default value to return if the offset does not exist.
-     *
-     */
-    public function getSegment(int $offset, $default = null)
+    public function get(int $offset): ?string
     {
         if ($offset < 0) {
-            $offset += count($this->data);
+            $offset += count($this->segments);
         }
 
-        return $this->data[$offset] ?? $default;
+        return $this->segments[$offset] ?? null;
     }
 
     /**
-     * Returns the associated key for each label.
-     *
-     * If a value is specified only the keys associated with
-     * the given value will be returned
-     *
-     * @param mixed ...$args the total number of argument given to the method
-     *
+     * {@inheritDoc}
      */
-    public function keys(...$args): array
+    public function keys(?string $segment = null): array
     {
-        if (empty($args)) {
-            return array_keys($this->data);
+        if (null === $segment) {
+            return array_keys($this->segments);
         }
 
-        return array_keys($this->data, $this->decodeComponent($this->validateString($args[0])), true);
+        return array_keys($this->segments, $segment, true);
     }
 
     /**
-     * Return the decoded string representation of the component.
-     *
+     * {@inheritDoc}
      */
-    protected function getDecoded(): string
+    public function segments(): array
     {
-        $front_delimiter = '';
-        if ($this->is_absolute === static::IS_ABSOLUTE) {
-            $front_delimiter = static::$separator;
+        return $this->segments;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function withoutDotSegments(): PathInterface
+    {
+        $path = $this->path->withoutDotSegments();
+        if ($path !== $this->path) {
+            return new self($path);
         }
 
-        return $front_delimiter.implode(static::$separator, $this->data);
+        return $this;
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
      */
-    public function __toString()
+    public function withLeadingSlash(): PathInterface
     {
-        return (string) $this->getContent();
+        $path = $this->path->withLeadingSlash();
+        if ($path !== $this->path) {
+            return new self($path);
+        }
+
+        return $this;
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
      */
-    public function withContent($value): ComponentInterface
+    public function withoutLeadingSlash(): PathInterface
     {
-        if ($value === $this->getContent()) {
+        $path = $this->path->withoutLeadingSlash();
+        if ($path !== $this->path) {
+            return new self($path);
+        }
+
+        return $this;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function withoutTrailingSlash(): PathInterface
+    {
+        $path = $this->path->withoutTrailingSlash();
+        if ($path !== $this->path) {
+            return new self($path);
+        }
+
+        return $this;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function withTrailingSlash(): PathInterface
+    {
+        $path = $this->path->withTrailingSlash();
+        if ($path !== $this->path) {
+            return new self($path);
+        }
+
+        return $this;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function withContent($content): UriComponentInterface
+    {
+        $content = self::filterComponent($content);
+        if ($content === $this->path->getContent()) {
             return $this;
         }
 
-        return new static($value);
+        return new self($content);
     }
 
     /**
-     * Returns an instance with the specified component prepended.
-     *
-     * This method MUST retain the state of the current instance, and return
-     * an instance that contains the modified component with the prepended data
-     *
-     * @param string $path the component to append
-     *
-     * @return static
+     * @param mixed|string $segment
      */
-    public function prepend(string $path): self
+    public function append($segment): SegmentedPathInterface
     {
-        $new_segments = $this->filterComponent($path);
-        if (!empty($new_segments) && '' === end($new_segments)) {
-            array_pop($new_segments);
+        $segment = self::filterComponent($segment);
+        if (null === $segment) {
+            throw new TypeError('The appended path can not be null.');
         }
 
-        return static::createFromSegments(array_merge($new_segments, $this->data), $this->is_absolute);
+        return new self(
+            rtrim($this->path->__toString(), self::SEPARATOR)
+            .self::SEPARATOR
+            .ltrim($segment, self::SEPARATOR)
+        );
     }
 
     /**
-     * Returns an instance with the specified component appended.
-     *
-     * This method MUST retain the state of the current instance, and return
-     * an instance that contains the modified component with the appended data
-     *
-     * @param string $path the component to append
-     *
-     * @return static
+     * @param mixed|string $segment
      */
-    public function append(string $path): self
+    public function prepend($segment): SegmentedPathInterface
     {
-        $new_segments = $this->filterComponent($path);
-        $data = $this->data;
-        if (!empty($data) && '' === end($data)) {
-            array_pop($data);
+        $segment = self::filterComponent($segment);
+        if (null === $segment) {
+            throw new TypeError('The prepended path can not be null.');
         }
 
-        return static::createFromSegments(array_merge($data, $new_segments), $this->is_absolute);
+        return new self(
+            rtrim($segment, self::SEPARATOR)
+            .self::SEPARATOR
+            .ltrim($this->path->__toString(), self::SEPARATOR)
+        );
     }
 
     /**
-     * Filter the component to append or prepend.
-     *
-     *
+     * @param mixed|string $segment
      */
-    protected function filterComponent(string $path): array
+    public function withSegment(int $key, $segment): SegmentedPathInterface
     {
-        $path = $this->validateString($path);
-        if ('' != $path && '/' == $path[0]) {
-            $path = substr($path, 1);
+        $nb_segments = count($this->segments);
+        if ($key < - $nb_segments - 1 || $key > $nb_segments) {
+            throw new OffsetOutOfBounds(sprintf('The given key `%s` is invalid.', $key));
         }
 
-        $filterSegment = function ($segment) {
-            return isset($segment);
+        if (0 > $key) {
+            $key += $nb_segments;
+        }
+
+        if ($nb_segments === $key) {
+            return $this->append($segment);
+        }
+
+        if (-1 === $key) {
+            return $this->prepend($segment);
+        }
+
+        if (!$segment instanceof PathInterface) {
+            $segment = new self($segment);
+        }
+
+        $segment = $this->decodeComponent((string) $segment);
+        if ($segment === $this->segments[$key]) {
+            return $this;
+        }
+
+        $segments = $this->segments;
+        $segments[$key] = $segment;
+        if ($this->isAbsolute()) {
+            array_unshift($segments, '');
+        }
+
+        return new self(implode(self::SEPARATOR, $segments));
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function withoutEmptySegments(): SegmentedPathInterface
+    {
+        return new self(preg_replace(',/+,', self::SEPARATOR, $this->__toString()));
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function withoutSegment(int ...$keys): SegmentedPathInterface
+    {
+        if ([] === $keys) {
+            return $this;
+        }
+        $nb_segments = count($this->segments);
+        $options = ['options' => ['min_range' => - $nb_segments, 'max_range' => $nb_segments - 1]];
+        $deleted_keys = [];
+        foreach ($keys as $value) {
+            /** @var false|int $offset */
+            $offset = filter_var($value, FILTER_VALIDATE_INT, $options);
+            if (false === $offset) {
+                throw new OffsetOutOfBounds(sprintf('The key `%s` is invalid.', $value));
+            }
+
+            if ($offset < 0) {
+                $offset += $nb_segments;
+            }
+            $deleted_keys[] = $offset;
+        }
+
+        $deleted_keys = array_keys(array_count_values($deleted_keys));
+        $filter = static function ($key) use ($deleted_keys): bool {
+            return !in_array($key, $deleted_keys, true);
         };
 
-        return array_filter(explode(static::$separator, $path), $filterSegment);
+        $path = implode(self::SEPARATOR, array_filter($this->segments, $filter, ARRAY_FILTER_USE_KEY));
+        if ($this->isAbsolute()) {
+            return new self(self::SEPARATOR.$path);
+        }
+
+        return new self($path);
     }
 
     /**
-     * Returns an instance with the modified label.
-     *
-     * This method MUST retain the state of the current instance, and return
-     * an instance that contains the modified component with the replaced data
-     *
-     * @param int    $offset    the label offset to remove and replace by the given component
-     * @param string $component the component added
-     *
-     * @return static
+     * @param mixed|string $path
      */
-    public function replaceSegment(int $offset, string $component): self
+    public function withDirname($path): SegmentedPathInterface
     {
-        $data = $this->replace($offset, $component);
-        if ($data === $this->data) {
+        if (!$path instanceof PathInterface) {
+            $path = new Path($path);
+        }
+
+        if ($path->getContent() === $this->getDirname()) {
             return $this;
         }
 
-        return self::createFromSegments($data, $this->is_absolute);
+        return new self(
+            rtrim($path->__toString(), self::SEPARATOR)
+            .self::SEPARATOR
+            .array_pop($this->segments)
+        );
     }
 
-
     /**
-     * Returns an instance without the specified keys.
-     *
-     * This method MUST retain the state of the current instance, and return
-     * an instance that contains the modified component
-     *
-     * @param int[] $offsets the list of keys to remove from the collection
-     *
-     * @return static
+     * {@inheritDoc}
      */
-    public function withoutSegments(array $offsets): self
+    public function withBasename($basename): SegmentedPathInterface
     {
-        $data = $this->delete($offsets);
-        if ($data === $this->data) {
-            return $this;
+        $basename = $this->validateComponent($basename);
+        if (null === $basename) {
+            throw new SyntaxError('A basename sequence can not be null.');
         }
 
-        return self::createFromSegments($data, $this->is_absolute);
+        if (false !== strpos($basename, self::SEPARATOR)) {
+            throw new SyntaxError('The basename can not contain the path separator.');
+        }
+
+        return $this->withSegment(count($this->segments) - 1, $basename);
     }
 
     /**
-     * Returns an instance with the specified parent directory's path.
-     *
-     * This method MUST retain the state of the current instance, and return
-     * an instance that contains the extension basename modified.
-     *
-     * @param string $path the new parent directory path
-     *
-     * @return static
+     * {@inheritDoc}
      */
-    public function withDirname(string $path): self
+    public function withExtension($extension): SegmentedPathInterface
     {
-        $path = $this->validateString($path);
-        if ($path === $this->getDirname()) {
+        $extension = $this->validateComponent($extension);
+        if (null === $extension) {
+            throw new SyntaxError('An extension sequence can not be null.');
+        }
+
+        if (false !== strpos($extension, self::SEPARATOR)) {
+            throw new SyntaxError('An extension sequence can not contain a path delimiter.');
+        }
+
+        if (0 === strpos($extension, '.')) {
+            throw new SyntaxError('An extension sequence can not contain a leading `.` character.');
+        }
+
+        /** @var string $basename */
+        $basename = end($this->segments);
+        [$ext, $param] = explode(';', $basename, 2) + [1 => null];
+        if ('' === $ext) {
             return $this;
         }
 
-        if ('' !== $path && substr($path, -1, 1) === '/') {
-            $path = substr($path, 0, -1);
-        }
-
-        return new static($path.'/'.array_pop($this->data));
+        return $this->withBasename($this->buildBasename($extension, (string) $ext, $param));
     }
 
     /**
-     * Returns an instance with the specified basename.
-     *
-     * This method MUST retain the state of the current instance, and return
-     * an instance that contains the extension basename modified.
-     *
-     * @param string $path the new path basename
-     *
-     * @return static
+     * Creates a new basename with a new extension.
      */
-    public function withBasename(string $path): self
+    private function buildBasename(string $extension, string $ext, string $param = null): string
     {
-        $path = $this->validateString($path);
-        if (false !== strpos($path, '/')) {
-            throw new Exception('The submitted basename can not contain the path separator');
-        }
-
-        $data = $this->data;
-        $basename = array_pop($data);
-        if ($path == $basename) {
-            return $this;
-        }
-
-        $data[] = $path;
-
-        return static::createFromSegments($data, $this->is_absolute);
-    }
-
-    /**
-     * Returns an instance with the specified basename extension.
-     *
-     * This method MUST retain the state of the current instance, and return
-     * an instance that contains the extension basename modified.
-     *
-     * @param string $extension the new extension
-     *                          can preceeded with or without the dot (.) character
-     *
-     * @return static
-     */
-    public function withExtension(string $extension): self
-    {
-        $extension = $this->formatExtension($extension);
-        $segments = $this->getSegments();
-        $basename = array_pop($segments);
-        $parts = explode(';', $basename, 2);
-        $basenamePart = array_shift($parts);
-        if ('' === $basenamePart || is_null($basenamePart)) {
-            return $this;
-        }
-
-        $newBasename = $this->buildBasename($basenamePart, $extension, array_shift($parts));
-        if ($basename === $newBasename) {
-            return $this;
-        }
-        $segments[] = $newBasename;
-
-        return $this->createFromSegments($segments, $this->is_absolute);
-    }
-
-    /**
-     * create a new basename with a new extension.
-     *
-     * @param string $basenamePart  the basename file part
-     * @param string $extension     the new extension to add
-     * @param string $parameterPart the basename parameter part
-     *
-     */
-    protected function buildBasename(
-        string $basenamePart,
-        string $extension,
-        string $parameterPart = null
-    ): string {
-        $length = strrpos($basenamePart, '.'.pathinfo($basenamePart, PATHINFO_EXTENSION));
+        $length = strrpos($ext, '.'.pathinfo($ext, PATHINFO_EXTENSION));
         if (false !== $length) {
-            $basenamePart = substr($basenamePart, 0, $length);
+            $ext = substr($ext, 0, $length);
         }
 
-        $parameterPart = trim((string) $parameterPart);
-        if ('' !== $parameterPart) {
-            $parameterPart = ";$parameterPart";
+        if (null !== $param && '' !== $param) {
+            $param = ';'.$param;
         }
 
         $extension = trim($extension);
-        if ('' !== $extension) {
-            $extension = ".$extension";
+        if ('' === $extension) {
+            return $ext.$param;
         }
 
-        return $basenamePart.$extension.$parameterPart;
-    }
-
-    /**
-     * validate and format the given extension.
-     *
-     * @param string $extension the new extension to use
-     *
-     * @throws Exception If the extension is not valid
-     *
-     */
-    protected function formatExtension(string $extension): string
-    {
-        if (0 === strpos($extension, '.')) {
-            throw new Exception('an extension sequence can not contain a leading `.` character');
-        }
-
-        if (strpos($extension, static::$separator)) {
-            throw new Exception('an extension sequence can not contain a path delimiter');
-        }
-
-        return implode(static::$separator, $this->validate($extension));
+        return $ext.'.'.$extension.$param;
     }
 }

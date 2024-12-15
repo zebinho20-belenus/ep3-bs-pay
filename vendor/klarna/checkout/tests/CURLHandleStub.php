@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright 2012 Klarna AB
+ * Copyright 2015 Klarna AB
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@
  * @category  Payment
  * @package   Klarna_Checkout
  * @author    Klarna <support@klarna.com>
- * @copyright 2012 Klarna AB
+ * @copyright 2015 Klarna AB
  * @license   http://www.apache.org/licenses/LICENSE-2.0 Apache license v2.0
  * @link      http://developers.klarna.com/
  */
@@ -32,12 +32,12 @@
  * @category  Payment
  * @package   Klarna_Checkout
  * @author    David K. <david.keijser@klarna.com>
- * @copyright 2012 Klarna AB
+ * @copyright 2015 Klarna AB
  * @license   http://www.apache.org/licenses/LICENSE-2.0 Apache license v2.0
  * @link      http://developers.klarna.com/
  */
-class Klarna_Checkout_HTTP_CURLHandleStub
-    implements Klarna_Checkout_HTTP_CURLHandleInterface
+class Klarna_Checkout_HTTP_CURLHandleStub implements
+    Klarna_Checkout_HTTP_CURLHandleInterface
 {
     /**
      * Options set
@@ -54,6 +54,8 @@ class Klarna_Checkout_HTTP_CURLHandleStub
     public $expectedURL;
 
     /**
+     * Stubbed information regarding this transfer.
+     *
      * @var array
      */
     public $info = array(
@@ -62,6 +64,8 @@ class Klarna_Checkout_HTTP_CURLHandleStub
     );
 
     /**
+     * Stubbed error message regarding this transfer.
+     *
      * @var string
      */
     public $error = 'Error message';
@@ -74,11 +78,15 @@ class Klarna_Checkout_HTTP_CURLHandleStub
     public $response = null;
 
     /**
+     * Stubbed closed state of this transfer.
+     *
      * @var boolean
      */
     public $closed = false;
 
     /**
+     * Stubbed headers for this transfer.
+     *
      * @var array
      */
     public $headers = array();
@@ -105,7 +113,8 @@ class Klarna_Checkout_HTTP_CURLHandleStub
     {
         if ($this->options[CURLOPT_URL] !== $this->expectedURL) {
             throw new Klarna_Checkout_Exception(
-                "Unexpected url: " . $this->options[CURLOPT_URL], 998
+                "Unexpected url: " . $this->options[CURLOPT_URL],
+                998
             );
         }
 

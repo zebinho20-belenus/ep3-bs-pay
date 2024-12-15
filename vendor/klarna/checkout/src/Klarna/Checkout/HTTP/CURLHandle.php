@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright 2012 Klarna AB
+ * Copyright 2015 Klarna AB
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@
  * @package    Payment_Klarna
  * @subpackage HTTP
  * @author     Klarna <support@klarna.com>
- * @copyright  2012 Klarna AB
+ * @copyright  2015 Klarna AB
  * @license    http://www.apache.org/licenses/LICENSE-2.0 Apache license v2.0
  * @link       http://developers.klarna.com/
  */
@@ -34,15 +34,16 @@
  * @package    Payment_Klarna
  * @subpackage HTTP
  * @author     David K. <david.keijser@klarna.com>
- * @copyright  2012 Klarna AB
+ * @copyright  2015 Klarna AB
  * @license    http://www.apache.org/licenses/LICENSE-2.0 Apache license v2.0
  * @link       http://developers.klarna.com/
  */
-class Klarna_Checkout_HTTP_CURLHandle
-    implements Klarna_Checkout_HTTP_CURLHandleInterface
+class Klarna_Checkout_HTTP_CURLHandle implements
+    Klarna_Checkout_HTTP_CURLHandleInterface
 {
     /**
-     * cURL handle
+     * Handle for cURL.
+     *
      * @var resource
      */
     private $_handle = null;

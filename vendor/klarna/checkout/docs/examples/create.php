@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright 2013 Klarna AB
+ * Copyright 2015 Klarna AB
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,20 +22,39 @@
  * @package   Klarna_Checkout
  * @author    David Keijser <david.keijser@klarna.com>
  * @author    Rickard Dybeck <rickard.dybeck@klarna.com>
- * @copyright 2013 Klarna AB
+ * @copyright 2015 Klarna AB
  * @license   http://www.apache.org/licenses/LICENSE-2.0 Apache license v2.0
  * @link      http://developers.klarna.com/
  */
 
 require_once 'src/Klarna/Checkout.php';
 
-Klarna_Checkout_Order::$baseUri
-    = 'https://checkout.testdrive.klarna.com/checkout/orders';
-Klarna_Checkout_Order::$contentType
-    = "application/vnd.klarna.checkout.aggregated-order-v2+json";
-
 $eid = '0';
 $sharedSecret = 'sharedSecret';
+
+$connector = Klarna_Checkout_Connector::create(
+    $sharedSecret,
+    Klarna_Checkout_Connector::BASE_TEST_URL
+);
+
+$order = new Klarna_Checkout_Order($connector);
+
+$create['purchase_country'] = 'SE';
+$create['purchase_currency'] = 'SEK';
+$create['locale'] = 'sv-se';
+// $create['recurring'] = true;
+$create['merchant'] = array(
+    'id' => $eid,
+    'terms_uri' => 'http://example.com/terms.html',
+    'checkout_uri' => 'http://example.com/checkout.php',
+    'confirmation_uri' => 'http://example.com/confirmation.php' .
+        '?klarna_order_id={checkout.order.id}',
+    // You can not receive push notification on non publicly available URI
+    'push_uri' => 'http://example.com/push.php' .
+        '?klarna_order_id={checkout.order.id}'
+);
+$create['cart']['items'] = array();
+
 $cart = array(
     array(
         'reference' => '123456789',
@@ -55,23 +74,20 @@ $cart = array(
     )
 );
 
-$connector = Klarna_Checkout_Connector::create($sharedSecret);
-$order = new Klarna_Checkout_Order($connector);
-
-$create['purchase_country'] = 'SE';
-$create['purchase_currency'] = 'SEK';
-$create['locale'] = 'sv-se';
-$create['merchant']['id'] = $eid;
-$create['merchant']['terms_uri'] = 'http://example.com/terms.php';
-$create['merchant']['checkout_uri'] = 'https://example.com/checkout.php';
-$create['merchant']['confirmation_uri']
-    = 'https://example.com/thankyou.php?sid=123&klarna_order={checkout.order.uri}';
-$create['merchant']['push_uri']
-    = 'https://example.com/push.php?sid=123&klarna_order={checkout.order.uri}';
-$create['cart'] = array();
 
 foreach ($cart as $item) {
     $create['cart']['items'][] = $item;
 }
 
-$order->create($create);
+try {
+    $order->create($create);
+    $order->fetch();
+
+    $orderID = $order['id'];
+
+    echo sprintf('Order ID: %s', $orderID);
+} catch (Klarna_Checkout_ApiErrorException $e) {
+    var_dump($e->getMessage());
+    var_dump($e->getPayload());
+    die;
+}

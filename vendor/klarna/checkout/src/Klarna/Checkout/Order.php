@@ -1,7 +1,6 @@
 <?php
-
 /**
- * Copyright 2012 Klarna AB
+ * Copyright 2015 Klarna AB
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +21,7 @@
  * @category  Payment
  * @package   Klarna_Checkout
  * @author    Klarna <support@klarna.com>
- * @copyright 2012 Klarna AB
+ * @copyright 2015 Klarna AB
  * @license   http://www.apache.org/licenses/LICENSE-2.0 Apache license v2.0
  * @link      http://developers.klarna.com/
  */
@@ -34,135 +33,47 @@
  * @package   Klarna_Checkout
  * @author    Majid G. <majid.garmaroudi@klarna.com>
  * @author    David K. <david.keijser@klarna.com>
- * @copyright 2012 Klarna AB
+ * @author    Matthias Feist <matthias.feist@klarna.com>
+ * @copyright 2015 Klarna AB
  * @license   http://www.apache.org/licenses/LICENSE-2.0 Apache license v2.0
  * @link      http://developers.klarna.com/
  */
-class Klarna_Checkout_Order
-    implements Klarna_Checkout_ResourceInterface, ArrayAccess
+class Klarna_Checkout_Order extends Klarna_Checkout_Resource implements
+    Klarna_Checkout_ResourceCreateableInterface,
+    Klarna_Checkout_ResourceFetchableInterface,
+    Klarna_Checkout_ResourceUpdateableInterface
 {
     /**
-     * Base URI that is used to create order resources
+     * Path that is used to create resources
      *
      * @var string
      */
-    public static $baseUri = null;
+    protected $relativePath = '/checkout/orders';
 
     /**
      * Content Type to use
      *
      * @var string
      */
-    public static $contentType = null;
+    protected $contentType
+        = "application/vnd.klarna.checkout.aggregated-order-v2+json";
 
     /**
-     * Accept header to use
-     *
-     * @var string
-     */
-    public static $accept = null;
-
-    /**
-     * URI of remote resource
-     *
-     * @var string
-     */
-    private $_location;
-
-    /**
-     * Order data
-     *
-     * @var array
-     */
-    private $_data = array();
-
-    /**
-     * Connector
-     *
-     * @var Klarna_Checkout_ConnectorInterface
-     */
-    protected $connector;
-
-    /**
-     * Create a new Order object
+     * Create a new order.
      *
      * @param Klarna_Checkout_ConnectorInterface $connector connector to use
-     * @param string                             $uri       uri of resource
-     *
-     * @return void
+     * @param string                             $id        Order id
      */
     public function __construct(
         Klarna_Checkout_ConnectorInterface $connector,
-        $uri = null
+        $id = null
     ) {
-        $this->connector = $connector;
-        if ($uri !== null) {
+        parent::__construct($connector);
+
+        if ($id !== null) {
+            $uri = $this->connector->getDomain() . "{$this->relativePath}/{$id}";
             $this->setLocation($uri);
         }
-    }
-
-    /**
-     * Get the URL of the resource
-     *
-     * @return string
-     */
-    public function getLocation()
-    {
-        return $this->_location;
-    }
-
-    /**
-     * Set the URL of the resource
-     *
-     * @param string $location URL of the resource
-     *
-     * @return void
-     */
-    public function setLocation($location)
-    {
-        $this->_location = strval($location);
-    }
-
-    /**
-     * Return content type of the resource
-     *
-     * @return string Content type
-     */
-    public function getContentType()
-    {
-        return self::$contentType;
-    }
-
-    /**
-     * Return accept header of the resource
-     *
-     * @return string Accept header
-     */
-    public function getAccept()
-    {
-        return self::$accept;
-    }
-
-    /**
-     * Replace resource data
-     *
-     * @param array $data data
-     *
-     * @return void
-     */
-    public function parse(array $data)
-    {
-        $this->_data = $data;
-    }
-
-    /**
-     * Basic representation of the object
-     *
-     * @return array Data
-     */
-    public function marshal()
-    {
-        return $this->_data;
     }
 
     /**
@@ -175,7 +86,7 @@ class Klarna_Checkout_Order
     public function create(array $data)
     {
         $options = array(
-            'url' => self::$baseUri,
+            'url' => $this->connector->getDomain() . $this->relativePath,
             'data' => $data
         );
 
@@ -190,7 +101,7 @@ class Klarna_Checkout_Order
     public function fetch()
     {
         $options = array(
-            'url' => $this->_location
+            'url' => $this->location
         );
         $this->connector->apply('GET', $this, $options);
     }
@@ -206,71 +117,9 @@ class Klarna_Checkout_Order
         array $data
     ) {
         $options = array(
-            'url' => $this->_location,
+            'url' => $this->location,
             'data' => $data
         );
         $this->connector->apply('POST', $this, $options);
-    }
-
-    /**
-     * Get value of a key
-     *
-     * @param string $key Key
-     *
-     * @return mixed data
-     */
-    public function offsetGet($key)
-    {
-        if (!is_string($key)) {
-            throw new InvalidArgumentException("Key must be string");
-        }
-
-        return $this->_data[$key];
-    }
-
-    /**
-     * Set value of a key
-     *
-     * @param string $key   Key
-     * @param mixed  $value Value of the key
-     *
-     * @return void
-     */
-    public function offsetSet($key, $value)
-    {
-        if (!is_string($key)) {
-            throw new InvalidArgumentException("Key must be string");
-        }
-
-        $value = print_r($value, true);
-        throw new RuntimeException(
-            "Use update function to change values. trying to set $key to $value"
-        );
-    }
-
-    /**
-     * Check if a key exists in the resource
-     *
-     * @param string $key key
-     *
-     * @return boolean
-     */
-    public function offsetExists($key)
-    {
-        return array_key_exists($key, $this->_data);
-    }
-
-    /**
-     * Unset the value of a key
-     *
-     * @param string $key key
-     *
-     * @return void
-     */
-    public function offsetUnset($key)
-    {
-        throw new RuntimeException(
-            "unset of fields not supported. trying to unset $key"
-        );
     }
 }
