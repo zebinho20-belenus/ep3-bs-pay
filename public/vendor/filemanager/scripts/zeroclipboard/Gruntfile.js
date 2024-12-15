@@ -30,7 +30,7 @@ module.exports = function(grunt) {
         jshintrc: true
       },
       gruntfile: ["Gruntfile.js"],
-      component: ["index.js"],
+      component: ["index.js.bak"],
       js: ["src/js/**/*.js", "!src/js/start.js", "!src/js/end.js"],
       test: ["test/**/*.js"],
       dist: ["dist/*.js", "!dist/*.min.js"]

@@ -46,7 +46,7 @@ module.exports = (grunt) ->
       amd:
         src: [
           "AMD_header"
-          "components/component-emitter/index.js"
+          "components/component-emitter/index.js.bak"
           "lib/dropzone.js"
           "AMD_footer"
         ]
