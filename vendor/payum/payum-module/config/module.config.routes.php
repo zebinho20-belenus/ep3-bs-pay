@@ -41,19 +41,6 @@ return array(
                     ),
                 ),
             ),
-            'payum_confirm_do' => array(
-                'type' => 'Segment',
-                'options' => array(
-                    'route' => '/payment/confirm[/:payum_token]',
-                    'constraints' => array(
-                        'payum_token' => '[a-zA-Z0-9_-]+'
-                    ),
-                    'defaults' => array(
-                        'controller' => 'PayumConfirm',
-                        'action' => 'do'
-                    ),
-                ),
-            ),
             'payum_refund_do' => array(
                 'type' => 'Segment',
                 'options' => array(

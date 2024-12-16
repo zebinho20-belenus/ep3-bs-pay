@@ -26,7 +26,6 @@ class TokenFactoryFactory implements FactoryInterface
             'capture' => 'payum_capture_do',
             'notify' => 'payum_notify_do',
             'authorize' => 'payum_authorize_do',
-            'confirm' => 'payum_confirm_do',
             'refund' => 'payum_refund_do'
         ));
     }
